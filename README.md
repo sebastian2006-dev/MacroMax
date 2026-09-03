@@ -1,6 +1,15 @@
 # MacroMax
 
 Standalone native macro & nutrition tracking Android application built with React Native (Expo), TypeScript, NativeWind, and on-device local storage.
+## 📱 Screenshots
+
+| Today's Overview | Daily Log | Custom Dish Builder |
+| :---: | :---: | :---: |
+| <img src="./assets/SC1.jpeg" width="250" alt="Today's Overview" /> | <img src="./assets/SC2.jpeg" width="250" alt="Daily Log" /> | <img src="./assets/SC3.jpeg" width="250" alt="Custom Dish Builder" /> |
+
+| Food Search & Sliding Window | Analytics Dashboard | Profile & Settings |
+| :---: | :---: | :---: |
+| <img src="./assets/SC4.jpeg" width="250" alt="Food Search" /> | <img src="./assets/SC5.jpeg" width="250" alt="Analytics Dashboard" /> | <img src="./assets/SC6.jpeg" width="250" alt="Profile & Settings" /> |
 
 ## Features
 
