@@ -168,13 +168,13 @@ function MacroSplitCard({ bucket, periodLabel }: { bucket: Bucket; periodLabel: 
   const totalGrams = bucket.protein + bucket.carbs + bucket.fats;
   const percent = (value: number) => (totalGrams > 0 ? Math.round((value / totalGrams) * 100) : 0);
 
-  // Donut colors: Protein = secondary blue, Carbs = tertiary orange, Fat =
-  // tertiary-deep orange — same family as Carbs but distinct enough to read
-  // as separate arcs inside the ring.
+  // Donut colors (product preference for the macro split ring):
+  // Protein = red, Carbs = green, Fat = yellow. This is a chart-only
+  // override — the trend lines & stat tiles keep the Vitality Core colors.
   const segments: MacroDonutSegment[] = [
-    { key: "protein", label: "Protein", value: bucket.protein, color: COLORS.secondary },
-    { key: "carbs", label: "Carbs", value: bucket.carbs, color: COLORS.tertiary },
-    { key: "fats", label: "Fats", value: bucket.fats, color: COLORS.tertiaryDeep },
+    { key: "protein", label: "Protein", value: bucket.protein, color: "#DC2626" },
+    { key: "carbs", label: "Carbs", value: bucket.carbs, color: COLORS.primary },
+    { key: "fats", label: "Fats", value: bucket.fats, color: "#EAB308" },
   ];
 
   return (
