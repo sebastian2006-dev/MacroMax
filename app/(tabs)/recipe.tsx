@@ -1,6 +1,8 @@
-import React, { memo, useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   Text,
@@ -10,6 +12,7 @@ import {
 import { useFocusEffect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AppHeader } from "@/components/AppHeader";
+import { IngredientResultsSheet } from "@/components/IngredientResultsSheet";
 import { RequireAuth } from "@/components/RequireAuth";
 import { SearchBar } from "@/components/SearchBar";
 import { defaultServingFor, ServingInput } from "@/components/ServingInput";
@@ -32,22 +35,6 @@ import { CustomRecipe, RecipeIngredient, SearchResult, ServingPortion } from "@/
 import { COLORS } from "@/src/theme/colors";
 import { SHADOWS } from "@/src/theme/shadows";
 
-/** Provider/source line for a search result row. */
-function sourceLabel(result: SearchResult): string {
-  switch (result.source) {
-    case "custom_recipe":
-      return "Saved dish · full saved batch";
-    case "fatsecret":
-      return "FatSecret · per 100 g";
-    case "open_food_facts":
-      return "Open Food Facts · per 100 g";
-    case "fallback":
-      return "Built-in reference · per 100 g";
-    default:
-      return "Custom food";
-  }
-}
-
 interface DraftIngredient {
   food: SearchResult;
   /** Raw quantity the user typed, e.g. "2" or "150" (for display). */
@@ -69,50 +56,6 @@ function ingredientServingState(ingredient: DraftIngredient): ServingState {
   };
 }
 
-interface IngredientResultsListProps {
-  results: SearchResult[];
-  selectedId: string | null;
-  onSelect: (result: SearchResult) => void;
-}
-
-/**
- * Memoized search-results list. The parent only gives it a new `results`
- * identity when the debounced query completes, so typing inside the
- * SearchBar / ServingInput never re-renders the list.
- */
-const IngredientResultsList = memo(function IngredientResultsList({
-  results,
-  selectedId,
-  onSelect,
-}: IngredientResultsListProps) {
-  return (
-    <>
-      {results.map((result) => {
-        const isSelected = selectedId === result.id;
-        return (
-          <Pressable
-            key={result.id}
-            onPress={() => onSelect(result)}
-            className={`mb-1.5 rounded-xl px-3 py-2.5 ${
-              isSelected ? "bg-primary-soft" : "bg-wash"
-            }`}
-          >
-            <Text
-              className="font-manrope-semibold text-sm text-ink"
-              numberOfLines={1}
-            >
-              {result.name}
-            </Text>
-            <Text className="font-manrope text-xs text-ink-muted">
-              {sourceLabel(result)} · {Math.round(result.calories)} kcal / 100 g
-            </Text>
-          </Pressable>
-        );
-      })}
-    </>
-  );
-});
-
 function RecipeContent() {
   const { userId } = useAuth();
   const { addMealItem } = useDailyLog(userId);
@@ -130,6 +73,19 @@ function RecipeContent() {
   const [saving, setSaving] = useState(false);
   const [selected, setSelected] = useState<SearchResult | null>(null);
   const [serving, setServing] = useState<ServingState>(DEFAULT_SERVING_STATE);
+  // Lets the user dismiss the sliding results window; a new query re-opens it.
+  const [resultsDismissed, setResultsDismissed] = useState(false);
+
+  useEffect(() => {
+    setResultsDismissed(false);
+  }, [query]);
+
+  // Sliding window visibility: only while a search is active and the user
+  // has not dismissed it (loading shows the spinner inside the window).
+  const showResultsWindow =
+    !resultsDismissed &&
+    query.trim().length >= 2 &&
+    (loading || ingredientResults.length > 0);
 
   // Totals fold: scale each ingredient by its gram quantity, then add.
   const totals = useMemo(() => {
@@ -154,6 +110,11 @@ function RecipeContent() {
   const handleSelectResult = useCallback((result: SearchResult) => {
     setSelected(result);
     setServing(defaultServingFor(result));
+    setResultsDismissed(true); // close the sliding window; quantity panel opens below
+  }, []);
+
+  const handleCloseResults = useCallback(() => {
+    setResultsDismissed(true);
   }, []);
 
   function addIngredient() {
@@ -231,10 +192,14 @@ function RecipeContent() {
   return (
     <SafeAreaView className="flex-1 bg-surface" edges={["left", "right"]}>
       <AppHeader />
-      <ScrollView
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
         className="flex-1"
-        contentContainerStyle={{ padding: 16, paddingBottom: clearance }}
       >
+        <ScrollView
+          className="flex-1"
+          contentContainerStyle={{ padding: 16, paddingBottom: clearance }}
+        >
         <View className="mb-4">
           <Text className="font-manrope-extrabold text-2xl text-ink">Custom Dish</Text>
           <Text className="font-manrope mt-1 text-sm text-ink-muted">
@@ -260,18 +225,9 @@ function RecipeContent() {
             onChangeText={setQuery}
             placeholder="Search ingredient (FatSecret / Open Food Facts)"
           />
-
-          {loading ? (
-            <View className="mb-2 items-start">
-              <ActivityIndicator color={COLORS.primary} />
-            </View>
-          ) : null}
-
-          <IngredientResultsList
-            results={ingredientResults}
-            selectedId={selected?.id ?? null}
-            onSelect={handleSelectResult}
-          />
+          <Text className="font-manrope mt-1 text-xs text-ink-faint">
+            Results slide up in a window — tap one to set its serving.
+          </Text>
 
           {selected ? (
             <View className="mt-3 mb-4 rounded-2xl bg-wash p-3">
@@ -383,7 +339,17 @@ function RecipeContent() {
             </View>
           ))
         )}
-      </ScrollView>
+        </ScrollView>
+
+        {/* Sliding window with ranked ingredient results */}
+        <IngredientResultsSheet
+          visible={showResultsWindow}
+          loading={loading}
+          results={ingredientResults}
+          onSelect={handleSelectResult}
+          onClose={handleCloseResults}
+        />
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

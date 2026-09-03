@@ -21,6 +21,7 @@ import { useDailyLog } from "@/src/hooks/useDailyLog";
 import { useFoodSearch } from "@/src/hooks/useFoodSearch";
 import { searchFoodByBarcode } from "@/src/lib/api";
 import { getCustomRecipes } from "@/src/lib/db";
+import { sourceLabel } from "@/src/lib/foodLabels";
 import { CustomRecipe, MealType, SearchResult } from "@/src/types";
 import { COLORS } from "@/src/theme/colors";
 import { SHADOWS } from "@/src/theme/shadows";
@@ -50,22 +51,6 @@ function recipeToResult(recipe: CustomRecipe): SearchResult {
     servingSize: "1 dish",
     portions: [],
   };
-}
-
-/** Provider/source line for a result row. */
-function sourceLabel(result: SearchResult): string {
-  switch (result.source) {
-    case "custom_recipe":
-      return "Saved dish · full saved batch";
-    case "fatsecret":
-      return "FatSecret · per 100 g";
-    case "open_food_facts":
-      return "Open Food Facts · per 100 g";
-    case "fallback":
-      return "Built-in reference · per 100 g";
-    default:
-      return "Custom food";
-  }
 }
 
 type SearchTab = "dishes" | "database";

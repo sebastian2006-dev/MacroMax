@@ -1,72 +1,78 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { ActivityIndicator, Dimensions, Pressable, ScrollView, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  Dimensions,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
 import { LineChart } from "react-native-chart-kit";
 import { useFocusEffect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { RequireAuth } from "@/components/RequireAuth";
 import { AppHeader } from "@/components/AppHeader";
+import { MacroDonut, MacroDonutSegment } from "@/components/MacroDonut";
 import { useTabBarClearance } from "@/components/ScrollableTabBar";
 import { useAuth } from "@/src/hooks/useAuth";
 import { getDailyLogs } from "@/src/lib/db";
-import {
-  addDays,
-  getDateNDaysAgo,
-  startOfWeek,
-  toLocalDateString,
-} from "@/src/lib/nutrition";
+import { addDays, getDateNDaysAgo, startOfWeek, toLocalDateString } from "@/src/lib/nutrition";
 import { CHART_COLORS, COLORS } from "@/src/theme/colors";
 import { SHADOWS } from "@/src/theme/shadows";
 import { DailyLog } from "@/src/types";
 
 type ViewMode = "week" | "month";
 
+interface Bucket {
+  key: string;
+  label: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fats: number;
+}
+
 function parseDate(dateStr: string): Date {
   const [year, month, day] = dateStr.split("-").map(Number);
   return new Date(year, month - 1, day);
 }
 
-function buildWeeklyData(logs: DailyLog[], weeks: number) {
+function emptyBucket(key: string, label: string): Bucket {
+  return { key, label, calories: 0, protein: 0, carbs: 0, fats: 0 };
+}
+
+function buildWeeklyData(logs: DailyLog[], weeks: number): Bucket[] {
   const today = new Date();
   const currentMonday = startOfWeek(today);
-  const buckets: { key: string; label: string; calories: number; protein: number }[] = [];
+  const buckets: Bucket[] = [];
 
   for (let i = weeks - 1; i >= 0; i--) {
     const monday = addDays(currentMonday, -i * 7);
-    buckets.push({
-      key: toLocalDateString(monday),
-      label: `${monday.getMonth() + 1}/${monday.getDate()}`,
-      calories: 0,
-      protein: 0,
-    });
+    buckets.push(emptyBucket(toLocalDateString(monday), `${monday.getMonth() + 1}/${monday.getDate()}`));
   }
 
   for (const log of logs) {
-    const date = parseDate(log.log_date);
-    const monday = startOfWeek(date);
-    const key = toLocalDateString(monday);
-    const bucket = buckets.find((item) => item.key === key);
+    const monday = startOfWeek(parseDate(log.log_date));
+    const bucket = buckets.find((item) => item.key === toLocalDateString(monday));
     if (bucket) {
       bucket.calories += log.total_calories;
       bucket.protein += log.total_protein;
+      bucket.carbs += log.total_carbs;
+      bucket.fats += log.total_fats;
     }
   }
 
   return buckets;
 }
 
-function buildMonthlyData(logs: DailyLog[], months: number) {
+function buildMonthlyData(logs: DailyLog[], months: number): Bucket[] {
   const now = new Date();
-  const buckets: { key: string; label: string; calories: number; protein: number }[] = [];
+  const buckets: Bucket[] = [];
 
   for (let i = months - 1; i >= 0; i--) {
     const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-    buckets.push({
-      key,
-      label: date.toLocaleString("en", { month: "short" }),
-      calories: 0,
-      protein: 0,
-    });
+    buckets.push(emptyBucket(key, date.toLocaleString("en", { month: "short" })));
   }
 
   for (const log of logs) {
@@ -75,6 +81,8 @@ function buildMonthlyData(logs: DailyLog[], months: number) {
     if (bucket) {
       bucket.calories += log.total_calories;
       bucket.protein += log.total_protein;
+      bucket.carbs += log.total_carbs;
+      bucket.fats += log.total_fats;
     }
   }
 
@@ -101,8 +109,121 @@ function makeChartConfig(lineColor: string) {
   };
 }
 
-function datasetLineColor(lineColor: string) {
+function lineColor(lineColor: string) {
   return (opacity = 1) => rgba(lineColor, opacity);
+}
+
+// Macro line colors follow the Vitality palette: Calories = primary green,
+// Protein = secondary blue, Fat = tertiary orange.
+const LINE_COLORS = {
+  calories: CHART_COLORS.lineCalories,
+  protein: CHART_COLORS.lineProtein,
+  fats: COLORS.tertiary,
+};
+
+function MetricCard({
+  title,
+  color,
+  chartData,
+  width,
+  metric,
+}: {
+  title: string;
+  color: string;
+  chartData: Bucket[];
+  width: number;
+  metric: "calories" | "protein" | "fats";
+}) {
+  return (
+    <View className="mb-4 rounded-2xl bg-card p-4" style={SHADOWS.card}>
+      <View className="mb-3 flex-row items-center">
+        <View className="mr-2 h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
+        <Text className="font-manrope-bold flex-1 text-base text-ink">{title}</Text>
+        <Text className="font-manrope text-xs text-ink-muted">
+          {Math.round(chartData[chartData.length - 1][metric])} {metric === "calories" ? "kcal" : "g"}
+        </Text>
+      </View>
+      <LineChart
+        data={{
+          labels: chartData.map((item) => item.label),
+          datasets: [
+            {
+              data: chartData.map((item) => Math.round(item[metric])),
+              color: lineColor(color),
+              strokeWidth: 2,
+            },
+          ],
+        }}
+        width={width}
+        height={200}
+        chartConfig={makeChartConfig(color)}
+        bezier
+        style={{ borderRadius: 16 }}
+      />
+    </View>
+  );
+}
+
+function MacroSplitCard({ bucket, periodLabel }: { bucket: Bucket; periodLabel: string }) {
+  const totalGrams = bucket.protein + bucket.carbs + bucket.fats;
+  const percent = (value: number) => (totalGrams > 0 ? Math.round((value / totalGrams) * 100) : 0);
+
+  // Donut colors: Protein = secondary blue, Carbs = tertiary orange, Fat =
+  // tertiary-deep orange — same family as Carbs but distinct enough to read
+  // as separate arcs inside the ring.
+  const segments: MacroDonutSegment[] = [
+    { key: "protein", label: "Protein", value: bucket.protein, color: COLORS.secondary },
+    { key: "carbs", label: "Carbs", value: bucket.carbs, color: COLORS.tertiary },
+    { key: "fats", label: "Fats", value: bucket.fats, color: COLORS.tertiaryDeep },
+  ];
+
+  return (
+    <View className="mb-4 rounded-2xl bg-card p-4" style={SHADOWS.card}>
+      <Text className="font-manrope-bold mb-3 text-base text-ink">Macro split · {periodLabel}</Text>
+      <View className="flex-row items-center">
+        <MacroDonut
+          segments={segments}
+          centerValue={String(Math.round(bucket.calories))}
+          centerLabel="kcal"
+          size={132}
+          strokeWidth={16}
+        />
+        <View className="ml-5 flex-1">
+          {segments.map((segment) => (
+            <View key={segment.key} className="mb-2.5 flex-row items-center">
+              <View className="mr-2 h-2.5 w-2.5 rounded-full" style={{ backgroundColor: segment.color }} />
+              <Text className="font-manrope flex-1 text-sm text-ink-muted">{segment.label}</Text>
+              <Text className="font-manrope-semibold text-sm text-ink">
+                {Math.round(segment.value)}g
+              </Text>
+              <Text className="font-manrope ml-2 w-9 text-right text-xs text-ink-faint">
+                {percent(segment.value)}%
+              </Text>
+            </View>
+          ))}
+          {totalGrams === 0 ? (
+            <Text className="font-manrope mt-1 text-xs text-ink-faint">
+              Nothing logged {periodLabel.toLowerCase()} yet.
+            </Text>
+          ) : null}
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function StatTile({ label, value, unit, color }: { label: string; value: number; unit: string; color: string }) {
+  return (
+    <View className="mx-1 flex-1 rounded-2xl bg-card p-3" style={SHADOWS.card}>
+      <Text className="font-manrope text-[11px] text-ink-muted">{label}</Text>
+      <View className="mt-1 flex-row items-baseline">
+        <Text className="font-manrope-extrabold text-lg" style={{ color }}>
+          {Math.round(value)}
+        </Text>
+        <Text className="font-manrope ml-1 text-[11px] text-ink-muted">{unit}</Text>
+      </View>
+    </View>
+  );
 }
 
 function AnalyticsContent() {
@@ -137,9 +258,12 @@ function AnalyticsContent() {
 
   const weeklyData = useMemo(() => buildWeeklyData(logs, 6), [logs]);
   const monthlyData = useMemo(() => buildMonthlyData(logs, 3), [logs]);
-  const currentWeek = weeklyData[weeklyData.length - 1];
-  const hasMonthlyData = monthlyData.filter((item) => item.calories > 0).length >= 2;
   const chartData = viewMode === "week" ? weeklyData : monthlyData;
+  const current = chartData[chartData.length - 1];
+  const periodLabel = viewMode === "week" ? "This week" : "This month";
+  const periodNoun = viewMode === "week" ? "Weekly" : "Monthly";
+
+  const hasMonthlyData = monthlyData.filter((item) => item.calories > 0).length >= 2;
   const hasAnyData = logs.some(
     (log) =>
       log.total_calories > 0 ||
@@ -158,10 +282,6 @@ function AnalyticsContent() {
 
   // Content width: screen − outer padding (16 × 2) − card padding (16 × 2).
   const chartWidth = Dimensions.get("window").width - 64;
-  const caloriesConfig = makeChartConfig(CHART_COLORS.lineCalories);
-  const proteinConfig = makeChartConfig(CHART_COLORS.lineProtein);
-  const lineCalories = datasetLineColor(CHART_COLORS.lineCalories);
-  const lineProtein = datasetLineColor(CHART_COLORS.lineProtein);
 
   return (
     <SafeAreaView className="flex-1 bg-surface" edges={["left", "right"]}>
@@ -169,10 +289,11 @@ function AnalyticsContent() {
       <ScrollView
         className="flex-1"
         contentContainerStyle={{ padding: 16, paddingBottom: bottomClearance }}
+        showsVerticalScrollIndicator={false}
       >
         <Text className="font-manrope-extrabold mb-1 text-2xl text-ink">Analytics</Text>
         <Text className="font-manrope mb-4 text-sm text-ink-muted">
-          Weekly totals and monthly overview
+          Calories, protein & fat trends across {viewMode === "week" ? "weeks" : "months"}
         </Text>
 
         {!hasAnyData ? (
@@ -183,31 +304,11 @@ function AnalyticsContent() {
           </View>
         ) : (
           <>
-            <View className="mb-4 flex-row">
-              <View className="mr-2 flex-1 rounded-2xl bg-card p-4" style={SHADOWS.card}>
-                <Text className="font-manrope text-sm text-ink-muted">
-                  This Week · Calories
-                </Text>
-                <Text className="font-manrope-extrabold mt-1 text-2xl text-ink">
-                  {Math.round(currentWeek?.calories ?? 0)} kcal
-                </Text>
-              </View>
-              <View className="flex-1 rounded-2xl bg-card p-4" style={SHADOWS.card}>
-                <Text className="font-manrope text-sm text-ink-muted">
-                  This Week · Protein
-                </Text>
-                <Text className="font-manrope-extrabold mt-1 text-2xl text-ink">
-                  {Math.round(currentWeek?.protein ?? 0)}g
-                </Text>
-              </View>
-            </View>
-
+            {/* Period toggle */}
             <View className="mb-4 flex-row rounded-full bg-wash p-1">
               <Pressable
                 onPress={() => setViewMode("week")}
-                className={`flex-1 rounded-full py-2 ${
-                  viewMode === "week" ? "bg-card" : ""
-                }`}
+                className={`flex-1 rounded-full py-2 ${viewMode === "week" ? "bg-card" : ""}`}
                 style={SHADOWS.card}
               >
                 <Text
@@ -239,58 +340,46 @@ function AnalyticsContent() {
                 </Text>
               </Pressable>
             </View>
-
             {!hasMonthlyData ? (
-              <Text className="font-manrope mb-3 text-center text-sm text-ink-muted">
+              <Text className="font-manrope mb-4 text-center text-xs text-ink-muted">
                 Monthly view unlocks after at least 2 months of data.
               </Text>
             ) : null}
 
-            <View className="mb-4 rounded-2xl bg-card p-4" style={SHADOWS.card}>
-              <Text className="font-manrope-bold mb-3 text-base text-ink">
-                {viewMode === "week" ? "Calories · Weekly totals" : "Calories · Monthly totals"}
-              </Text>
-              <LineChart
-                data={{
-                  labels: chartData.map((item) => item.label),
-                  datasets: [
-                    {
-                      data: chartData.map((item) => Math.round(item.calories)),
-                      color: lineCalories,
-                      strokeWidth: 2,
-                    },
-                  ],
-                }}
-                width={chartWidth}
-                height={220}
-                chartConfig={caloriesConfig}
-                bezier
-                style={{ borderRadius: 16 }}
-              />
+            {/* Stat tiles — balanced 3-up row */}
+            <View className="mb-4 flex-row justify-between">
+              <StatTile label={`${periodLabel} · Calories`} value={current?.calories ?? 0} unit="kcal" color={COLORS.primary} />
+              <StatTile label={`${periodLabel} · Protein`} value={current?.protein ?? 0} unit="g" color={COLORS.secondary} />
+              <StatTile label={`${periodLabel} · Fat`} value={current?.fats ?? 0} unit="g" color={COLORS.tertiary} />
             </View>
 
-            <View className="rounded-2xl bg-card p-4" style={SHADOWS.card}>
-              <Text className="font-manrope-bold mb-3 text-base text-ink">
-                {viewMode === "week" ? "Protein · Weekly totals" : "Protein · Monthly totals"}
-              </Text>
-              <LineChart
-                data={{
-                  labels: chartData.map((item) => item.label),
-                  datasets: [
-                    {
-                      data: chartData.map((item) => Math.round(item.protein)),
-                      color: lineProtein,
-                      strokeWidth: 2,
-                    },
-                  ],
-                }}
-                width={chartWidth}
-                height={220}
-                chartConfig={proteinConfig}
-                bezier
-                style={{ borderRadius: 16 }}
-              />
-            </View>
+            {/* Macro distribution donut */}
+            {current ? (
+              <MacroSplitCard bucket={current} periodLabel={periodLabel} />
+            ) : null}
+
+            {/* Trend charts */}
+            <MetricCard
+              title={`Calories · ${periodNoun} totals`}
+              color={LINE_COLORS.calories}
+              chartData={chartData}
+              width={chartWidth}
+              metric="calories"
+            />
+            <MetricCard
+              title={`Protein · ${periodNoun} totals`}
+              color={LINE_COLORS.protein}
+              chartData={chartData}
+              width={chartWidth}
+              metric="protein"
+            />
+            <MetricCard
+              title={`Fat · ${periodNoun} totals`}
+              color={LINE_COLORS.fats}
+              chartData={chartData}
+              width={chartWidth}
+              metric="fats"
+            />
           </>
         )}
       </ScrollView>

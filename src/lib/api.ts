@@ -10,7 +10,7 @@ import { searchFallbackFoods } from "@/src/lib/fallbackFoods";
 import { searchFatSecret } from "@/src/lib/fatSecret";
 import { searchOpenFoodFacts, searchOpenFoodFactsByBarcode } from "@/src/lib/openFoodFacts";
 import { safeResolve } from "@/src/lib/http";
-import { cacheRowsFromResults, dedupeResults, toSearchResult } from "@/src/lib/foodResults";
+import { cacheRowsFromResults, dedupeResults, sortFoodSearchResults, toSearchResult } from "@/src/lib/foodResults";
 import { reportSearchSources, SyncSource } from "@/src/lib/syncStatus";
 
 async function searchLocalCache(query: string): Promise<SearchResult[]> {
@@ -130,7 +130,9 @@ export async function searchFoods(query: string, userId?: string | null): Promis
     }
   }
 
-  const results = dedupeResults(collected);
+  // Dedupe, then rank by relevance: basic ingredients → prepared
+  // variations → complex dishes (see sortFoodSearchResults).
+  const results = sortFoodSearchResults(dedupeResults(collected), trimmed);
   await cacheResults(results);
 
   reportSearchSources([...sources], { remoteAttempted, remoteFailed });

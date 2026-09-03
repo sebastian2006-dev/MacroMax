@@ -12,9 +12,11 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   cacheRowsFromResults,
+  classifyFoodSearchMatch,
   dedupeResults,
   isCacheableSource,
   normalizeSource,
+  sortFoodSearchResults,
   toSearchResult,
 } from "../src/lib/foodResults";
 import type { FoodCacheItem, SearchResult } from "../src/types";
@@ -240,5 +242,139 @@ describe("normalizeSource() — legacy row migration", () => {
   it("unknown/undefined values become fallback", () => {
     assert.equal(normalizeSource(undefined), "fallback");
     assert.equal(normalizeSource("anything-else"), "fallback");
+  });
+});
+
+// ── classifyFoodSearchMatch ──────────────────────────────────────────────────
+describe("classifyFoodSearchMatch()", () => {
+  it("raw & plain ingredients are 'basic'", () => {
+    assert.equal(classifyFoodSearchMatch("Chicken breast raw", "fatsecret"), "basic");
+    assert.equal(classifyFoodSearchMatch("Chicken breast (cooked)", "fatsecret"), "basic");
+    assert.equal(classifyFoodSearchMatch("Chicken raw leg piece", "fatsecret"), "basic");
+  });
+
+  it("preparation styles are 'prepared'", () => {
+    assert.equal(classifyFoodSearchMatch("Fried chicken", "fatsecret"), "prepared");
+    assert.equal(classifyFoodSearchMatch("Grilled chicken wings", "fatsecret"), "prepared");
+    assert.equal(classifyFoodSearchMatch("Baked salmon fillet", "open_food_facts"), "prepared");
+  });
+
+  it("mixed dishes are 'complex'", () => {
+    assert.equal(classifyFoodSearchMatch("Chicken curry", "fatsecret"), "complex");
+    assert.equal(classifyFoodSearchMatch("Butter chicken", "fatsecret"), "complex");
+    assert.equal(classifyFoodSearchMatch("Chicken biryani", "fatsecret"), "complex");
+    assert.equal(classifyFoodSearchMatch("Egg fried rice", "fatsecret"), "complex"); // rice dish term wins over "fried"
+  });
+
+  it("custom recipes are pinned", () => {
+    assert.equal(classifyFoodSearchMatch("Anything at all", "custom_recipe"), "custom");
+  });
+
+  it("empty names are pushed down (complex)", () => {
+    assert.equal(classifyFoodSearchMatch("", "fatsecret"), "complex");
+  });
+});
+
+// ── sortFoodSearchResults ────────────────────────────────────────────────────
+describe("sortFoodSearchResults() — chicken example", () => {
+  const names = [
+    "Chicken biryani",
+    "Fried chicken",
+    "Chicken breast (raw)",
+    "Chicken curry",
+    "Grilled chicken wings",
+    "Butter chicken",
+    "Chicken breast (cooked)",
+    "Chicken raw leg piece",
+  ];
+  const results = names.map((name, i) =>
+    makeResult({ id: `c${i}`, name, source: "fatsecret", barcode: null, externalId: `fs-c${i}` })
+  );
+
+  const sorted = sortFoodSearchResults(results, "chicken");
+
+  it("keeps every result (no loss or duplication)", () => {
+    assert.equal(sorted.length, names.length);
+    assert.equal(new Set(sorted.map((r) => r.id)).size, names.length);
+  });
+
+  it("orders basic ingredients before prepared before complex", () => {
+    const position = (name: string) => sorted.findIndex((r) => r.name === name);
+    const basics = ["Chicken breast (raw)", "Chicken breast (cooked)", "Chicken raw leg piece"];
+    const prepared = ["Fried chicken", "Grilled chicken wings"];
+    const complex = ["Chicken curry", "Butter chicken", "Chicken biryani"];
+
+    const maxBasic = Math.max(...basics.map(position));
+    const minPrepared = Math.min(...prepared.map(position));
+    const maxPrepared = Math.max(...prepared.map(position));
+    const minComplex = Math.min(...complex.map(position));
+
+    assert.ok(maxBasic < minPrepared, "every basic ingredient ranks above every prepared dish");
+    assert.ok(maxPrepared < minComplex, "every prepared dish ranks above every complex dish");
+    // And the complex dishes own the tail of the list.
+    assert.deepEqual(
+      sorted.slice(minComplex).map((r) => r.name).sort(),
+      [...complex].sort()
+    );
+  });
+
+  it("raw variant ranks above the cooked variant of the same cut", () => {
+    const sortedNames = sorted.map((r) => r.name);
+    assert.ok(
+      sortedNames.indexOf("Chicken breast (raw)") < sortedNames.indexOf("Chicken breast (cooked)"),
+      "raw chicken breast should appear before cooked"
+    );
+  });
+});
+
+describe("sortFoodSearchResults() — general behaviour", () => {
+  it("is stable: equal-scoring results keep their input order", () => {
+    const results = [
+      makeResult({ id: "a", name: "Banana", source: "fatsecret", externalId: "fs-a" }),
+      makeResult({ id: "b", name: "banana split", source: "fatsecret", externalId: "fs-b" }),
+    ];
+    const sorted = sortFoodSearchResults(results, "banana");
+    assert.equal(sorted[0].id, "a");
+    assert.equal(sorted[1].id, "b");
+  });
+
+  it("pins custom recipes to the very top", () => {
+    const results = [
+      makeResult({ name: "Chicken breast (raw)", source: "fatsecret", externalId: "fs-1" }),
+      makeResult({ name: "My Sunday Chicken", source: "custom_recipe", externalId: null }),
+    ];
+    const sorted = sortFoodSearchResults(results, "chicken");
+    assert.equal(sorted[0].name, "My Sunday Chicken");
+  });
+
+  it("prefers exact/prefix phrase matches inside a category", () => {
+    const results = [
+      makeResult({ name: "Grilled whole chicken", source: "fatsecret", externalId: "fs-1" }),
+      makeResult({ name: "chicken", source: "fatsecret", externalId: "fs-2" }),
+      makeResult({ name: "Chicken breast", source: "fatsecret", externalId: "fs-3" }),
+    ];
+    const sorted = sortFoodSearchResults(results, "chicken");
+    assert.equal(sorted[0].name, "chicken"); // exact match
+    assert.equal(sorted[1].name, "Chicken breast"); // prefix match
+    assert.equal(sorted[2].name, "Grilled whole chicken"); // prepared, substring only
+  });
+
+  it("handles multi-word queries with token coverage", () => {
+    const results = [
+      makeResult({ name: "Chicken curry", source: "fatsecret", externalId: "fs-1" }),
+      makeResult({ name: "Chicken breast (raw)", source: "fatsecret", externalId: "fs-2" }),
+      makeResult({ name: "Chicken soup with rice", source: "fatsecret", externalId: "fs-3" }),
+    ];
+    const sorted = sortFoodSearchResults(results, "chicken breast");
+    assert.equal(sorted[0].name, "Chicken breast (raw)");
+  });
+
+  it("empty query keeps provider order", () => {
+    const results = [
+      makeResult({ name: "Zucchini", source: "fatsecret", externalId: "fs-z" }),
+      makeResult({ name: "Apple", source: "fatsecret", externalId: "fs-a" }),
+    ];
+    const sorted = sortFoodSearchResults(results, "");
+    assert.deepEqual(sorted.map((r) => r.name), ["Zucchini", "Apple"]);
   });
 });

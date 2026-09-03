@@ -96,3 +96,113 @@ export function normalizeSource(raw: unknown): FoodSource {
   // Legacy rows ("ifct2017" / "usda") written before the provider migration.
   return "fallback";
 }
+
+// ---------------------------------------------------------------------------
+// Search relevance & sorting
+//
+// Results are ranked by how "basic" the food is for the typed query:
+//   1. exact matches & raw single ingredients  (Chicken breast raw)
+//   2. cooked/prepared variations              (Fried chicken, Grilled wings)
+//   3. complex dishes containing the ingredient(Chicken curry, Butter chicken)
+// ---------------------------------------------------------------------------
+
+/** Words that mark a food name as a complex/mixed dish rather than an ingredient. */
+const COMPLEX_DISH_TERMS = [
+  "curry", "biryani", "masala", "tikka", "kebab", "kabab", "vindaloo", "korma",
+  "jalfrezi", "bhuna", "saag", "karahi", "kadai", "kadhai", "makhani",
+  "butter chicken", "kung pao", "general tso", "orange chicken", "sweet and sour",
+  "manchurian", "fried rice", "stew", "soup", "casserole", "lasagna", "lasagne",
+  "burger", "pizza", "sandwich", "burrito", "taco", "wrap", "ramen", "pho",
+  "chow mein", "bowl",
+];
+
+/** Words that mark a cooking/preparation style (still an ingredient, not a dish). */
+const PREPARED_TERMS = [
+  "fried", "grilled", "roasted", "baked", "broiled", "sauteed", "sautéed",
+  "seared", "deep-fried", "pan-fried", "air-fried", "stir-fried", "breaded",
+  "battered", "barbequed", "barbecued", "bbq", "smoked", "broasted",
+  "char-grilled", "roast", "scrambled", "poached", "tandoori", "smashed", "mashed",
+];
+
+export type SearchCategory = "custom" | "basic" | "prepared" | "complex";
+
+function normalizeFoodName(name: string): string {
+  return name.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+/**
+ * Classify one food name against the typed query:
+ *  - custom    → user's own saved dishes (always pinned first)
+ *  - basic     → plain/raw/cooked single ingredients
+ *  - prepared  → ingredients with a preparation style (fried, grilled…)
+ *  - complex   → multi-ingredient dishes (curry, biryani, burger…)
+ */
+export function classifyFoodSearchMatch(name: string, source: SearchResult["source"]): SearchCategory {
+  if (source === "custom_recipe") {
+    return "custom";
+  }
+  const normalized = normalizeFoodName(name);
+  if (!normalized) {
+    return "complex"; // unrankable — push down rather than up
+  }
+  if (COMPLEX_DISH_TERMS.some((term) => normalized.includes(term))) {
+    return "complex";
+  }
+  if (PREPARED_TERMS.some((term) => normalized.includes(term))) {
+    return "prepared";
+  }
+  return "basic";
+}
+
+/** Category base weights (higher = surfaced earlier). */
+const CATEGORY_WEIGHT: Record<SearchCategory, number> = {
+  custom: 10000,
+  basic: 300,
+  prepared: 200,
+  complex: 100,
+};
+
+/**
+ * Rank search results by relevance: basic ingredients first, prepared
+ * variations second, complex dishes last. Within a category, exact /
+ * prefix / substring phrase matches win, raw beats cooked, and the original
+ * provider order is the stable tie-break.
+ */
+export function sortFoodSearchResults(results: SearchResult[], query: string): SearchResult[] {
+  const q = normalizeFoodName(query);
+  const tokens = q.split(" ").filter(Boolean);
+
+  const scored = results.map((result, index) => {
+    const name = normalizeFoodName(result.name);
+    const category = classifyFoodSearchMatch(result.name, result.source);
+    let score = CATEGORY_WEIGHT[category];
+
+    // Phrase-match quality inside the category.
+    if (q && name === q) {
+      score += 100;
+    } else if (q && name.startsWith(q)) {
+      score += 60;
+    } else if (q && name.includes(q)) {
+      score += 30;
+    }
+    // Every query token appearing in the name boosts multi-word searches.
+    if (tokens.length > 1 && tokens.every((token) => name.includes(token))) {
+      score += 20;
+    }
+    // Within "basic", keep raw ahead of cooked.
+    if (name.includes("raw")) {
+      score += 6;
+    } else if (name.includes("cooked")) {
+      score += 2;
+    }
+    // Prefer ingredient databases over packaged-product listings.
+    if (result.source === "fatsecret") {
+      score += 4;
+    }
+
+    return { result, score, index };
+  });
+
+  scored.sort((a, b) => b.score - a.score || a.index - b.index);
+  return scored.map((entry) => entry.result);
+}

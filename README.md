@@ -62,7 +62,7 @@ Standalone native macro & nutrition tracking Android application built with Reac
 
 ## Testing
 
-**Status: ✅ 182 / 182 unit tests passing** (Node built-in test runner via `tsx`), plus a strict `tsc --noEmit` type-check. The tests exercise the **real `src/lib` modules** (pure logic only — no native/network dependencies), so they verify actual app behaviour, not copies of it.
+**Status: ✅ 195 / 195 unit tests passing** (Node built-in test runner via `tsx`), plus a strict `tsc --noEmit` type-check. The tests exercise the **real `src/lib` modules** (pure logic only — no native/network dependencies), so they verify actual app behaviour, not copies of it.
 
 ```bash
 npm test           # run all unit tests
@@ -76,7 +76,7 @@ GitHub Actions (`.github/workflows/ci.yml`) runs both jobs on every push to `mai
 | ----------------------------- | --------------------------------- | ----- | ---------------------------------------------------------------------- |
 | Nutrition engine              | `test/nutrition.test.ts`          | 38    | Macro add/scale/totals math, goal mapping, low-intake alerts at the 50% threshold, date helpers (`toLocalDateString`, `startOfWeek`, `addDays`, `getDateNDaysAgo`), rolling 7-day averages, meal-slot grouping |
 | Serving units                 | `test/servingUnits.test.ts`       | 50    | Piece-size rules (egg/roti/banana… incl. specificity & case/whitespace), grams conversion, quantity parsing, grams/pieces/portion modes, portion multipliers, pluralisation, settings reference table |
-| Food-search pipeline (`api`)  | `test/api.test.ts`                | 27    | Result dedupe (barcode → externalId → source+name), cache eligibility (only FatSecret/Open Food Facts), cache-row mapping incl. 2-dp rounding & portions, cache-row → result mapping, legacy `ifct2017`/`usda` row migration |
+| Food-search pipeline (`api`)  | `test/api.test.ts`                | 40    | Result dedupe (barcode → externalId → source+name), cache eligibility (only FatSecret/Open Food Facts), cache-row mapping incl. 2-dp rounding & portions, cache-row → result mapping, legacy `ifct2017`/`usda` row migration, **relevance sorting** (basic → prepared → complex, exact/prefix phrase priority, raw-before-cooked, custom-dish pinning, stability) |
 | Offline fallback database     | `test/fallbackFoods.test.ts`      | 15    | Case-insensitive substring search, macro values of key foods, Indian staple coverage, result shape (`fallback` source, `100 g` serving, stable ids) |
 | HTTP helpers                  | `test/http.test.ts`               | 16    | Defensive numeric coercion (`toNumber`) and RFC-4648 base64 used for FatSecret OAuth Basic auth (`toBase64`) |
 | FatSecret mapping             | `test/fatSecret.test.ts`          | 14    | Description parsing (`Per 100g - …`), `100 g`/default serving → per-100g derivation, single-serving JSON quirk, ml portions (1 ml ≈ 1 g), portion cap/dedupe, rejection of unusable foods |
