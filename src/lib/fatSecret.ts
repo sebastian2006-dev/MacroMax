@@ -245,7 +245,9 @@ export function parseDescriptionMacros(
   }
 
   const find = (label: string): number => {
-    const match = segment.find((part) => new RegExp(`^${label}\\s*:`).test(part));
+    // No ^ anchor: "Calories" usually shares its |-segment with the
+    // "Per 100g -" prefix (e.g. "Per 100g - Calories: 22kcal | …").
+    const match = segment.find((part) => new RegExp(`${label}\\s*:`).test(part));
     if (!match) {
       return 0;
     }
@@ -386,7 +388,7 @@ export function mapFatSecretFood(food: FatSecretFoodDetail): SearchResult | null
 }
 
 /** Lightweight result built purely from the search description (per 100 g). */
-function mapFatSecretSearchItem(item: FatSecretSearchItem): SearchResult | null {
+export function mapFatSecretSearchItem(item: FatSecretSearchItem): SearchResult | null {
   const name = item.food_name?.trim();
   if (!name) {
     return null;
