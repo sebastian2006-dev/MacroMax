@@ -13,7 +13,7 @@ module.exports = {
   theme: {
     extend: {
       // ------------------------------------------------------------------
-      // Vitality Core design tokens (DESIGN.md)
+      // Vitality Core design tokens (mirrored in src/theme/colors.ts)
       // ------------------------------------------------------------------
       colors: {
         // App background / surface (clean, cool near-white)

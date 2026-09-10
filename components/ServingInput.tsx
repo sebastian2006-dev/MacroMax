@@ -10,7 +10,6 @@ import {
 } from "@/src/lib/servingUnits";
 import { scaleMacros } from "@/src/lib/nutrition";
 import { SearchResult } from "@/src/types";
-import { COLORS } from "@/src/theme/colors";
 import { SHADOWS } from "@/src/theme/shadows";
 
 export type { ServingMode, ServingState } from "@/src/lib/servingUnits";
@@ -227,4 +226,3 @@ export const ServingInput = memo(
     prev.food.id === next.food.id && servingStateEqual(prev.state, next.state) && prev.onChange === next.onChange
 );
 
-export const SERVING_INPUT_HINT_COLOR = COLORS.inkFaint;

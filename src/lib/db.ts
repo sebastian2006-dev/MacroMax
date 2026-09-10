@@ -225,16 +225,6 @@ export async function insertCustomRecipe(
   return recipe;
 }
 
-export async function getRecipeIngredients(recipeId: string): Promise<RecipeIngredient[]> {
-  const ingredients = await readArray<RecipeIngredient>(RECIPE_INGREDIENTS_KEY);
-  return ingredients.filter((ingredient) => ingredient.recipe_id === recipeId);
-}
-
-export async function getDailyLog(date: string): Promise<DailyLog | null> {
-  const logs = await readArray<DailyLog>(DAILY_LOGS_KEY);
-  return logs.find((log) => log.log_date === date) ?? null;
-}
-
 export async function ensureDailyLog(date: string): Promise<DailyLog | null> {
   const logs = await readArray<DailyLog>(DAILY_LOGS_KEY);
   const existing = logs.find((log) => log.log_date === date);
