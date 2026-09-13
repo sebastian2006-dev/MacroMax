@@ -3,6 +3,7 @@ import { Animated, Easing, StyleSheet, Text, View } from "react-native";
 import Svg, { Circle, G } from "react-native-svg";
 import { COLORS, MACRO_TRACKS } from "@/src/theme/colors";
 import { SHADOWS } from "@/src/theme/shadows";
+import { TILE_MAX_FONT_SCALE } from "@/src/theme/typography";
 
 // React Native's built-in Animated API (no reanimated dependency) — works
 // identically on iOS, Android and web with react-native-svg.
@@ -32,6 +33,10 @@ interface MacroRingProps {
   /** Goal target; when 0/undefined the ring shows the plain count instead. */
   target?: number | null;
   color: string;
+  /**
+   * Design size of the ring in dp. It is used as the *maximum* diameter: the
+   * ring shrinks to fit narrower cards instead of overflowing them (see below).
+   */
   size?: number;
   strokeWidth?: number;
 }
@@ -40,6 +45,13 @@ interface MacroRingProps {
  * Animated circular progress ring (donut) for a daily macro total.
  * When no goal target is configured, the ring renders as a neutral full ring
  * with the actual count in the middle — no empty progress, no error clutter.
+ *
+ * Two cards sit side by side, so a card is only ~(screen − 64dp) / 2 wide: at
+ * `size = 132` a fixed-width <Svg> is wider than the card's content box on
+ * narrow phones and bleeds over the card edge / centre gutter. The SVG is
+ * therefore laid out at `width: 100%` of the card's content box (capped at
+ * `size`) with a square `viewBox`, which keeps the drawn geometry pixel-identical
+ * at full size and scales it down cleanly when the card is narrower.
  */
 export const MacroRing = React.memo(function MacroRing({
   label,
@@ -80,8 +92,8 @@ export const MacroRing = React.memo(function MacroRing({
 
   return (
     <View className="flex-1 items-center rounded-2xl bg-card p-4" style={SHADOWS.card}>
-      <View style={{ width: size, height: size }}>
-        <Svg width={size} height={size}>
+      <View style={{ width: "100%", maxWidth: size, aspectRatio: 1 }}>
+        <Svg width="100%" height="100%" viewBox={`0 0 ${size} ${size}`}>
           <Circle
             cx={size / 2}
             cy={size / 2}
@@ -107,18 +119,48 @@ export const MacroRing = React.memo(function MacroRing({
           ) : null}
         </Svg>
         <View style={[StyleSheet.absoluteFill, styles.center]}>
-          <Text className="text-3xl font-manrope-extrabold text-ink">{Math.round(value)}</Text>
-          <Text className="text-xs font-manrope text-ink-muted">{unit}</Text>
+          <Text
+            numberOfLines={1}
+            maxFontSizeMultiplier={TILE_MAX_FONT_SCALE}
+            className="text-3xl font-manrope-extrabold text-ink"
+          >
+            {Math.round(value)}
+          </Text>
+          <Text
+            numberOfLines={1}
+            maxFontSizeMultiplier={TILE_MAX_FONT_SCALE}
+            className="text-xs font-manrope text-ink-muted"
+          >
+            {unit}
+          </Text>
         </View>
       </View>
 
-      <Text className="mt-2 text-sm font-manrope-bold text-ink">{label}</Text>
+      {/* Caption: one line for the macro name (never "Protei…"), up to two
+          centred lines for the detail so it wraps instead of ellipsizing. */}
+      <Text
+        numberOfLines={1}
+        maxFontSizeMultiplier={TILE_MAX_FONT_SCALE}
+        className="mt-2 text-center text-sm font-manrope-bold text-ink"
+      >
+        {label}
+      </Text>
       {hasTarget ? (
-        <Text className="text-xs font-manrope text-ink-muted">
+        <Text
+          numberOfLines={2}
+          maxFontSizeMultiplier={TILE_MAX_FONT_SCALE}
+          className="text-center text-xs font-manrope text-ink-muted"
+        >
           {Math.round(value)} / {Math.round(target)} {unit}
         </Text>
       ) : (
-        <Text className="text-xs font-manrope text-ink-faint">Goal not set · set in Profile</Text>
+        <Text
+          numberOfLines={2}
+          maxFontSizeMultiplier={TILE_MAX_FONT_SCALE}
+          className="text-center text-xs font-manrope text-ink-faint"
+        >
+          Goal not set · set in Profile
+        </Text>
       )}
     </View>
   );

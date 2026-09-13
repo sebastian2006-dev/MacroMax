@@ -109,12 +109,16 @@ function DashboardContent() {
         contentContainerStyle={{ padding: 16, paddingBottom: tabBarClearance }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Greeting + selected date */}
-        <View className="mb-4">
+        {/* Greeting + selected date. The date line carries an explicit line
+            height (Android crops "Sunday, September 13" descenders when a custom
+            font's line box is tighter than its metrics) and the block's bottom
+            margin is split with the strip's own top margin below, so the date
+            can never be crowded or clipped by the calendar bar. */}
+        <View className="mb-3">
           <Text className="text-2xl font-manrope-extrabold text-ink">
             {name ? `Hi, ${name}` : "Today"}
           </Text>
-          <Text className="mt-0.5 text-sm font-manrope text-ink-muted">
+          <Text className="mt-1.5 text-sm leading-5 font-manrope text-ink-muted">
             {selectedDate.toLocaleDateString("en-US", {
               weekday: "long",
               month: "long",
@@ -127,7 +131,7 @@ function DashboardContent() {
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          className="mb-4"
+          className="mb-4 mt-1"
           contentContainerStyle={{ flexGrow: 1, columnGap: 8 }}
         >
           {weekDates.map((date) => {

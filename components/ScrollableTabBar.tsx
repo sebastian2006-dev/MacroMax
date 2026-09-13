@@ -5,9 +5,7 @@ import type { BottomTabBarProps } from "expo-router/tabs";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "@/src/theme/colors";
 import { SHADOWS } from "@/src/theme/shadows";
-
-/** Height of the tab bar content above the bottom safe-area inset. */
-export const TAB_BAR_CONTENT_HEIGHT = 62;
+import { MAX_TAB_SCALE, tabBarMetrics } from "@/src/lib/tabBarLayout";
 
 /** Tab metadata: name must match the Tabs.Screen route name in (tabs)/_layout. */
 interface TabItem {
@@ -25,8 +23,11 @@ export const TAB_ITEMS: TabItem[] = [
   { name: "settings", label: "Profile", icon: "person-outline", iconActive: "person" },
 ];
 
-/** Fixed slot width per tab; 5 tabs × 92 = 460 px > most phones → scrolls. */
-const TAB_ITEM_WIDTH = 92;
+/** Geometry — slot/height scaling rules live in src/lib/tabBarLayout.ts. */
+function useTabBarMetrics() {
+  const { fontScale } = useWindowDimensions();
+  return tabBarMetrics(fontScale);
+}
 
 /**
  * Bottom padding screens need under their scroll content so the last card is
@@ -34,7 +35,8 @@ const TAB_ITEM_WIDTH = 92;
  */
 export function useTabBarClearance(): number {
   const insets = useSafeAreaInsets();
-  return TAB_BAR_CONTENT_HEIGHT + Math.max(insets.bottom, 8) + 24;
+  const { contentHeight } = useTabBarMetrics();
+  return contentHeight + Math.max(insets.bottom, 8) + 24;
 }
 
 /**
@@ -45,6 +47,10 @@ export function useTabBarClearance(): number {
  * icons. The bar also owns its bottom safe-area inset (paddingBottom), which
  * fixes the previously truncated bottom edge on gesture-nav devices. The
  * focused tab is scrolled back into view on every navigation.
+ *
+ * Slots, icons and the bar height all scale with the OS font scale (bounded by
+ * MAX_TAB_SCALE) so labels stay complete — never "Daily L…" — while remaining
+ * readable for users who bump their system font size.
  */
 export const ScrollableTabBar = memo(function ScrollableTabBar({
   state,
@@ -53,16 +59,14 @@ export const ScrollableTabBar = memo(function ScrollableTabBar({
 }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
+  const { scale, itemWidth, contentHeight } = useTabBarMetrics();
   const scrollRef = useRef<ScrollView>(null);
   const focusedIndex = state.index;
 
   const scrollFocusedIntoView = useCallback(() => {
-    const offset = Math.max(
-      0,
-      focusedIndex * TAB_ITEM_WIDTH - (windowWidth - TAB_ITEM_WIDTH) / 2
-    );
+    const offset = Math.max(0, focusedIndex * itemWidth - (windowWidth - itemWidth) / 2);
     scrollRef.current?.scrollTo({ x: offset, animated: true });
-  }, [focusedIndex, windowWidth]);
+  }, [focusedIndex, itemWidth, windowWidth]);
 
   useEffect(() => {
     scrollFocusedIntoView();
@@ -75,7 +79,7 @@ export const ScrollableTabBar = memo(function ScrollableTabBar({
         {
           paddingTop: 8,
           paddingBottom: Math.max(insets.bottom, 8),
-          height: TAB_BAR_CONTENT_HEIGHT + Math.max(insets.bottom, 8),
+          height: contentHeight + Math.max(insets.bottom, 8),
         },
         SHADOWS.nav,
       ]}
@@ -121,24 +125,25 @@ export const ScrollableTabBar = memo(function ScrollableTabBar({
               accessibilityRole="tab"
               accessibilityState={{ selected: isFocused }}
               accessibilityLabel={label}
-              style={{ width: TAB_ITEM_WIDTH }}
+              style={{ width: itemWidth }}
               className="items-center justify-center"
             >
               <View
                 className={`items-center justify-center rounded-full px-3 ${
                   isFocused ? "bg-primary-soft" : "bg-transparent"
                 }`}
-                style={{ minHeight: 30 }}
+                style={{ minHeight: 30 * scale }}
               >
                 <Ionicons
                   name={isFocused ? item.iconActive : item.icon}
-                  size={22}
+                  size={Math.round(22 * scale)}
                   color={color}
                 />
               </View>
               <Text
                 numberOfLines={1}
-                className={`mt-0.5 px-1 text-[11px] ${
+                maxFontSizeMultiplier={MAX_TAB_SCALE}
+                className={`mt-0.5 px-0.5 text-[11px] ${
                   isFocused ? "font-manrope-bold text-primary" : "font-manrope-semibold text-ink-faint"
                 }`}
               >
