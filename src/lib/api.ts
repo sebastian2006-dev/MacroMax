@@ -10,7 +10,14 @@ import { searchFallbackFoods } from "@/src/lib/fallbackFoods";
 import { searchFatSecret } from "@/src/lib/fatSecret";
 import { searchOpenFoodFacts, searchOpenFoodFactsByBarcode } from "@/src/lib/openFoodFacts";
 import { safeResolve } from "@/src/lib/http";
-import { cacheRowsFromResults, dedupeResults, sortFoodSearchResults, toSearchResult } from "@/src/lib/foodResults";
+import {
+  cacheRowsFromResults,
+  dedupeResults,
+  isLocalSufficient,
+  LOCAL_SUFFICIENCY_THRESHOLD,
+  sortSearchResults,
+  toSearchResult,
+} from "@/src/lib/foodResults";
 import { reportSearchSources, SyncSource } from "@/src/lib/syncStatus";
 
 async function searchLocalCache(query: string): Promise<SearchResult[]> {
@@ -65,17 +72,22 @@ async function cacheResults(results: SearchResult[]): Promise<void> {
 }
 
 /**
- * Search foods with a local-first, provider-parallel strategy:
+ * Search foods with a strict LOCAL-FIRST strategy:
  *
- *   1. Saved custom dishes — always surfaced first.
- *   2. FatSecret Platform API + Open Food Facts searched in PARALLEL:
+ *   1. On-device layer, queried first and in parallel:
+ *        - saved custom dishes (always surfaced, pinned to the top),
+ *        - the food cache (mirrors earlier lookups — offline repeats),
+ *        - the built-in reference list (static DB, never empty for staples).
+ *   2. If the local layer already returns enough matches
+ *      (>= LOCAL_SUFFICIENCY_THRESHOLD) we STOP here — no network at all.
+ *   3. Otherwise the remote providers are queried in PARALLEL to top up:
  *        - FatSecret: raw ingredients, cooked dishes, Indian foods (text).
  *        - Open Food Facts: packaged products (search + portions).
- *   3. On-device food cache (mirrors earlier lookups — offline repeats).
- *   4. Built-in fallback list — last resort so a search never hangs empty.
  *
- * Every provider is individually guarded, so a missing key, timeout or bad
- * response can never crash the app or reject the whole search.
+ * Everything is finally run through the SAME relevance sort, so local and
+ * remote rows are ranked by one consistent 3-tier algorithm. Every provider is
+ * individually guarded, so a missing key, timeout or bad response can never
+ * crash the app or reject the whole search.
  */
 export async function searchFoods(query: string, userId?: string | null): Promise<SearchResult[]> {
   const trimmed = query.trim();
@@ -87,52 +99,57 @@ export async function searchFoods(query: string, userId?: string | null): Promis
   const collected: SearchResult[] = [];
   const sources = new Set<SyncSource>();
 
-  // 1) Saved dishes (custom recipes) first.
-  const customRecipes = await safeResolve(() => searchCustomRecipes(userId ?? null, trimmed), []);
+  // 1) LOCAL LAYER FIRST — saved dishes + on-device cache + built-in DB.
+  const [customRecipes, cached, builtIn] = await Promise.all([
+    safeResolve(() => searchCustomRecipes(userId ?? null, trimmed), []),
+    safeResolve(() => searchLocalCache(trimmed), []),
+    Promise.resolve(searchFallbackFoods(trimmed)),
+  ]);
+
   if (customRecipes.length > 0) {
     sources.add("custom_recipe");
     collected.push(...customRecipes);
   }
-
-  // 2) Remote providers in parallel — FatSecret (text/ingredients) and
-  //    Open Food Facts (packaged) complement each other.
-  const [fatSecretResults, offResults] = await Promise.all([
-    safeResolve(() => searchFatSecret(trimmed), []),
-    safeResolve(() => searchOpenFoodFacts(trimmed), []),
-  ]);
-
-  const remoteAttempted = true;
-  let remoteFailed = true;
-  if (fatSecretResults.length > 0) {
-    remoteFailed = false;
-    sources.add("fatsecret");
-    collected.push(...fatSecretResults);
-  }
-  if (offResults.length > 0) {
-    remoteFailed = false;
-    sources.add("open_food_facts");
-    collected.push(...offResults);
-  }
-
-  // 3) Local cache mirrors earlier lookups and keeps repeats working offline.
-  const cached = await safeResolve(() => searchLocalCache(trimmed), []);
   if (cached.length > 0) {
     sources.add("local_cache");
     collected.push(...cached);
   }
+  if (builtIn.length > 0) {
+    sources.add("fallback");
+    collected.push(...builtIn);
+  }
 
-  // 4) Last resort: built-in fallback list when everything else came up empty.
-  if (collected.length === 0 && remoteFailed) {
-    const fallbackResults = searchFallbackFoods(trimmed);
-    if (fallbackResults.length > 0) {
-      sources.add("fallback");
-      collected.push(...fallbackResults);
+  const localMatches = dedupeResults(collected);
+
+  // 2) Enough local matches? Return them and STOP — never touch the network.
+  let remoteAttempted = false;
+  let remoteFailed = false;
+
+  if (!isLocalSufficient(localMatches.length, LOCAL_SUFFICIENCY_THRESHOLD)) {
+    // 3) Remote providers in parallel — only reached when local is thin.
+    remoteAttempted = true;
+    remoteFailed = true;
+
+    const [fatSecretResults, offResults] = await Promise.all([
+      safeResolve(() => searchFatSecret(trimmed), []),
+      safeResolve(() => searchOpenFoodFacts(trimmed), []),
+    ]);
+
+    if (fatSecretResults.length > 0) {
+      remoteFailed = false;
+      sources.add("fatsecret");
+      collected.push(...fatSecretResults);
+    }
+    if (offResults.length > 0) {
+      remoteFailed = false;
+      sources.add("open_food_facts");
+      collected.push(...offResults);
     }
   }
 
-  // Dedupe, then rank by relevance: basic ingredients → prepared
-  // variations → complex dishes (see sortFoodSearchResults).
-  const results = sortFoodSearchResults(dedupeResults(collected), trimmed);
+  // One unified relevance sort for both local and remote results:
+  // basic ingredients → prepared variations → complex dishes.
+  const results = sortSearchResults(dedupeResults(collected), trimmed);
   await cacheResults(results);
 
   reportSearchSources([...sources], { remoteAttempted, remoteFailed });

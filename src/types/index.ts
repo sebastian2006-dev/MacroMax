@@ -120,6 +120,12 @@ export interface GoalTargets {
   calories: number;
   protein: number;
   carbs: number;
+  /**
+   * Daily fat LIMIT — an upper bound the user sets to their own preference,
+   * NOT a goal to reach. It shares the numeric targets field but is read as
+   * "do not exceed", so it never feeds the low-intake nudges. Exceeding it is
+   * reported by getLimitAlerts() instead.
+   */
   fats: number;
 }
 
@@ -128,6 +134,23 @@ export interface LowIntakeAlert {
   label: string;
   current: number;
   target: number;
+  percent: number;
+  message: string;
+}
+
+/**
+ * Warning shown when a macro that is tracked as an upper LIMIT has been
+ * exceeded. Fats is the only such macro today, so unlike LowIntakeAlert this
+ * fires when the user is ABOVE the limit rather than below a goal.
+ */
+export interface LimitAlert {
+  key: keyof Macros;
+  label: string;
+  current: number;
+  limit: number;
+  /** Grams over the limit (always > 0 when this alert exists). */
+  over: number;
+  /** `current` as a percentage of the limit; deliberately not capped at 100. */
   percent: number;
   message: string;
 }

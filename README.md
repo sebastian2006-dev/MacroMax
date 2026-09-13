@@ -5,9 +5,9 @@
 Built natively with React Native (Expo), TypeScript, and NativeWind — no account required, all data lives on-device.
 
 ![Platform](https://img.shields.io/badge/platform-Android-3DDC84?logo=android&logoColor=white)
-![Expo](https://img.shields.io/badge/Expo-SDK%2052-000020?logo=expo&logoColor=white)
+![Expo](https://img.shields.io/badge/Expo-SDK%2057-000020?logo=expo&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-195%2F195%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-219%2F219%20passing-brightgreen)
 
 ---
 
@@ -39,17 +39,19 @@ Built natively with React Native (Expo), TypeScript, and NativeWind — no accou
 ## Features
 
 **Tracking**
-- **Today's Overview** dashboard with animated goal rings (Calories · Protein) and macro bars (Carbs · Fats)
+- **Today's Overview** dashboard with animated goal rings (Calories · Protein) and macro bars (Carbs goal · Fats limit)
 - **Daily Log** for managing meals across Breakfast, Lunch, Dinner and Snacks/Extra
 - **Custom Dish** builder — name a dish, pick ingredients + servings, save it as a one-tap loggable batch
-- Customizable daily targets for calories, protein, carbs, and fats
+- Customizable daily goals for calories, protein and carbs, plus a settable daily fat **limit** — you're nudged to reach your goals, but only warned once you go *over* the fat ceiling
 - Weekly / monthly analytics
 
 **Food Search**
 - Barcode scanning via `expo-camera` → **Open Food Facts V2** product endpoint
 - Text search via **FatSecret Platform API** (OAuth 2.0, raw ingredients & dishes) + **Open Food Facts** (packaged products)
 - Serving-aware logging: grams, pieces/units, and provider **standard portions** (including ml-based servings)
-- Debounced, input-isolated search UI (no typing latency), with an offline cache for repeat lookups
+- **Debounced** input (~350 ms) — the pipeline fires once the user stops typing, never per keystroke
+- **Local-first**: the on-device layer (saved dishes + cache + built-in list) is queried before the network; the remote APIs are only hit when it returns fewer than 5 matches
+- **Strict 3-tier relevance ranking** — raw ingredients → cooked/prepared → complex dishes — applied identically to local and API results
 
 **Navigation & UX**
 - Horizontal **sliding-window bottom navigation** (safe-area aware) across Today, Daily Log, Custom Dish, Analytics and Profile
@@ -60,8 +62,8 @@ Built natively with React Native (Expo), TypeScript, and NativeWind — no accou
 
 | Layer | Technology |
 | --- | --- |
-| Framework | React Native / Expo SDK 52 |
-| Routing | Expo Router v4 (sliding custom tab bar) |
+| Framework | React Native / Expo SDK 57 |
+| Routing | Expo Router v57 (sliding custom tab bar) |
 | Language | TypeScript (`strict: true`) |
 | Styling | NativeWind (Tailwind CSS) with the **Vitality Core** design tokens (Manrope) |
 | Storage | AsyncStorage (offline-first, no account required) |
@@ -117,16 +119,16 @@ cd android && ./gradlew assembleRelease
 | Flow | Provider | Notes |
 | --- | --- | --- |
 | Barcode scanning | Open Food Facts V2 `…/api/v2/product/{barcode}.json` | Custom `User-Agent` header required |
+| **Text search (local-first)** | Saved dishes + on-device AsyncStorage cache + built-in reference list | Queried FIRST; the remote APIs are skipped when it yields ≥ 5 matches |
 | Packaged products | Open Food Facts search (`cgi/search.pl`) | Serving sizes mapped to portions |
 | Raw ingredients & dishes | FatSecret Platform API (`food.search`/`foods.search`, `food.get`, OAuth 2.0 client-credentials) | Serving table → standard portions (g & ml) |
-| Repeat lookups | On-device AsyncStorage cache | Offline-friendly |
-| Last resort | Built-in reference list | Never hangs empty |
+| Result ordering | Unified 3-tier relevance sort | Tier 1 raw/basic → Tier 2 cooked/prepared → Tier 3 complex dishes |
 
 ---
 
 ## Testing
 
-**Status: ✅ 195 / 195 unit tests passing** (Node built-in test runner via `tsx`), plus a strict `tsc --noEmit` type-check. Tests exercise the **real `src/lib` modules** (pure logic only — no native/network dependencies), so they verify actual app behaviour rather than copies of it.
+**Status: ✅ 219 / 219 unit tests passing** (Node built-in test runner via `tsx`), plus a strict `tsc --noEmit` type-check. Tests exercise the **real `src/lib` modules** (pure logic only — no native/network dependencies), so they verify actual app behaviour rather than copies of it.
 
 ```bash
 npm test           # run all unit tests
@@ -138,9 +140,10 @@ GitHub Actions (`.github/workflows/ci.yml`) runs both jobs on every push to `mai
 
 | Suite | File | Tests | What it ensures |
 | --- | --- | --- | --- |
-| Nutrition engine | `test/nutrition.test.ts` | 38 | Macro add/scale/totals math, goal mapping, low-intake alerts at the 50% threshold, date helpers (`toLocalDateString`, `startOfWeek`, `addDays`, `getDateNDaysAgo`), rolling 7-day averages, meal-slot grouping |
+| Nutrition engine | `test/nutrition.test.ts` | 45 | Macro add/scale/totals math, goal mapping, low-intake alerts at the 50% threshold (fats excluded — it is a limit, not a goal), over-limit detection with overshoot reporting, date helpers (`toLocalDateString`, `startOfWeek`, `addDays`, `getDateNDaysAgo`), rolling 7-day averages, meal-slot grouping |
 | Serving units | `test/servingUnits.test.ts` | 50 | Piece-size rules (egg/roti/banana… incl. specificity & case/whitespace), grams conversion, quantity parsing, grams/pieces/portion modes, portion multipliers, pluralisation, settings reference table |
-| Food-search pipeline (`api`) | `test/api.test.ts` | 40 | Result dedupe (barcode → externalId → source+name), cache eligibility (only FatSecret/Open Food Facts), cache-row mapping incl. 2-dp rounding & portions, cache-row → result mapping, legacy `ifct2017`/`usda` row migration, **relevance sorting** (basic → prepared → complex, exact/prefix phrase priority, raw-before-cooked, custom-dish pinning, stability) |
+| Food-search pipeline (`api`) | `test/api.test.ts` | 51 | Result dedupe (barcode → externalId → source+name), cache eligibility (only FatSecret/Open Food Facts), cache-row mapping incl. 2-dp rounding & portions, cache-row → result mapping, legacy `ifct2017`/`usda` row migration, **strict 3-tier relevance sorting** (raw → prepared → complex, exact/prefix phrase priority, raw-before-cooked, custom-dish pinning, stability), public tier mapping, and the **local-first sufficiency policy** |
+| Debounce primitive | `test/debounce.test.ts` | 6 | Trailing-edge debounce (mock timers): delay honoured, burst collapses to the latest value once, `cancel()`/`flush()`, `pending` state, 300–500 ms default |
 | Offline fallback database | `test/fallbackFoods.test.ts` | 15 | Case-insensitive substring search, macro values of key foods, Indian staple coverage, result shape (`fallback` source, `100 g` serving, stable ids) |
 | HTTP helpers | `test/http.test.ts` | 16 | Defensive numeric coercion (`toNumber`) and RFC-4648 base64 used for FatSecret OAuth Basic auth (`toBase64`) |
 | FatSecret mapping | `test/fatSecret.test.ts` | 14 | Description parsing (`Per 100g - …`), `100 g`/default serving → per-100g derivation, single-serving JSON quirk, ml portions (1 ml ≈ 1 g), portion cap/dedupe, rejection of unusable foods |
@@ -158,9 +161,9 @@ While building this suite, the tests surfaced and fixed two real defects:
 
 ```text
 app/                    # Expo Router screens (tabs: index=Today, log, recipe, analytics, settings)
-components/             # Reusable UI components (incl. ScrollableTabBar, AddFoodSheet, ServingInput)
-src/hooks/              # Data hooks
-src/lib/                # Local storage, nutrition, provider clients (fatSecret.ts, openFoodFacts.ts)
+components/             # Reusable UI components (incl. ScrollableTabBar, AddFoodSheet, ServingInput, SearchBar)
+src/hooks/              # Data hooks (useFoodSearch, useDebouncedValue, …)
+src/lib/                # Local storage, nutrition, debounce, provider clients (fatSecret.ts, openFoodFacts.ts)
 src/theme/              # Vitality Core semantic colors + shadow styles
 src/types/              # Shared TypeScript types
 test/                   # Unit tests (Node test runner + tsx)

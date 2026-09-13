@@ -7,7 +7,6 @@
     "icon": "./assets/icon.png",
     "scheme": "macromax",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.macromax.app"
@@ -16,7 +15,7 @@
       "package": "com.macromax.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#112037"
+        "backgroundColor": "#FFFFFF"
       },
       "permissions": [
         "CAMERA",

@@ -1,5 +1,4 @@
-import React from "react";
-import { ActivityIndicator, View } from "react-native";
+import React, { useEffect } from "react";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -15,7 +14,10 @@ import "../global.css";
 import { COLORS } from "@/src/theme/colors";
 
 export default function RootLayout() {
-  const [fontsLoaded] = useFonts({
+  // Start loading Manrope, but never let it gate the first paint: if the fonts
+  // are slow or fail to load, the app used to sit on a full-screen spinner
+  // forever. Text falls back to the system font and swaps in when ready.
+  const [, fontError] = useFonts({
     Manrope_400Regular,
     Manrope_500Medium,
     Manrope_600SemiBold,
@@ -23,13 +25,11 @@ export default function RootLayout() {
     Manrope_800ExtraBold,
   });
 
-  if (!fontsLoaded) {
-    return (
-      <View className="flex-1 items-center justify-center bg-surface">
-        <ActivityIndicator size="large" color={COLORS.primary} />
-      </View>
-    );
-  }
+  useEffect(() => {
+    if (fontError) {
+      console.warn("Manrope could not be loaded; using the system font.", fontError);
+    }
+  }, [fontError]);
 
   return (
     <SafeAreaProvider>

@@ -14,9 +14,13 @@ import {
   cacheRowsFromResults,
   classifyFoodSearchMatch,
   dedupeResults,
+  getSearchTier,
   isCacheableSource,
+  isLocalSufficient,
+  LOCAL_SUFFICIENCY_THRESHOLD,
   normalizeSource,
   sortFoodSearchResults,
+  sortSearchResults,
   toSearchResult,
 } from "../src/lib/foodResults";
 import type { FoodCacheItem, SearchResult } from "../src/types";
@@ -376,5 +380,100 @@ describe("sortFoodSearchResults() — general behaviour", () => {
     ];
     const sorted = sortFoodSearchResults(results, "");
     assert.deepEqual(sorted.map((r) => r.name), ["Zucchini", "Apple"]);
+  });
+});
+
+// ── getSearchTier — the public 1/2/3 hierarchy ───────────────────────────────
+describe("getSearchTier()", () => {
+  it("Tier 1: raw / plain single ingredients (incl. other cuts)", () => {
+    assert.equal(getSearchTier("Chicken breast raw", "fatsecret"), 1);
+    assert.equal(getSearchTier("Chicken breast (raw)", "fatsecret"), 1);
+    assert.equal(getSearchTier("Chicken raw leg piece", "fatsecret"), 1); // raw stays Tier 1
+    assert.equal(getSearchTier("Chicken breast (cooked)", "fatsecret"), 1);
+  });
+
+  it("Tier 2: cooked/prepared variations", () => {
+    assert.equal(getSearchTier("Fried chicken", "fatsecret"), 2);
+    assert.equal(getSearchTier("Grilled chicken wings", "open_food_facts"), 2);
+  });
+
+  it("Tier 3: complex multi-ingredient dishes", () => {
+    assert.equal(getSearchTier("Chicken curry", "fatsecret"), 3);
+    assert.equal(getSearchTier("Butter chicken", "fatsecret"), 3);
+  });
+});
+
+// ── sortSearchResults — strict tier separation ───────────────────────────────
+describe("sortSearchResults() — strict tier enforcement", () => {
+  it("never lets a lower tier outrank a higher tier, even on a stronger match", () => {
+    const results = [
+      // Tier 3 exact phrase match — the strongest possible within-tier score.
+      makeResult({ id: "c", name: "Chicken curry", source: "fatsecret", externalId: "fs-c" }),
+      // Tier 2 with no phrase bonus at all.
+      makeResult({ id: "p", name: "Grilled chicken", source: "fatsecret", externalId: "fs-p" }),
+      // Tier 1 with no phrase bonus at all.
+      makeResult({ id: "b", name: "Chicken breast (raw)", source: "fatsecret", externalId: "fs-b" }),
+    ];
+
+    const sorted = sortSearchResults(results, "chicken curry");
+    assert.deepEqual(
+      sorted.map((r) => r.id),
+      ["b", "p", "c"],
+      "tier order must dominate the within-tier score"
+    );
+  });
+
+  it("sorts the chicken example into the 3 tiers with raw breast first", () => {
+    const names = [
+      "Chicken breast (raw)", // tier 1
+      "Chicken breast (cooked)", // tier 1
+      "Chicken raw leg piece", // tier 1 — any raw single ingredient stays Tier 1
+      "Fried chicken", // tier 2
+      "Chicken curry", // tier 3
+      "Butter chicken", // tier 3
+    ];
+    const results = names.map((name, i) =>
+      makeResult({ id: `x${i}`, name, source: "fatsecret", barcode: null, externalId: `fs-${i}` })
+    );
+
+    const order = sortSearchResults(results, "chicken").map((r) => r.name);
+    assert.deepEqual(order, [
+      "Chicken breast (raw)",
+      "Chicken raw leg piece",
+      "Chicken breast (cooked)",
+      "Fried chicken",
+      "Chicken curry",
+      "Butter chicken",
+    ]);
+  });
+
+  it("is aliased by the legacy sortFoodSearchResults name", () => {
+    assert.equal(sortFoodSearchResults, sortSearchResults);
+  });
+});
+
+// ── isLocalSufficient — local-DB-first policy ────────────────────────────────
+describe("isLocalSufficient() — local-first switch", () => {
+  it("defaults to a threshold of 5 matches", () => {
+    assert.equal(LOCAL_SUFFICIENCY_THRESHOLD, 5);
+  });
+
+  it("a total local miss falls through to the remote APIs", () => {
+    assert.equal(isLocalSufficient(0), false);
+  });
+
+  it("too few local matches still falls through", () => {
+    assert.equal(isLocalSufficient(1), false);
+    assert.equal(isLocalSufficient(4), false);
+  });
+
+  it("enough local matches skip the remote APIs entirely", () => {
+    assert.equal(isLocalSufficient(5), true);
+    assert.equal(isLocalSufficient(12), true);
+  });
+
+  it("accepts a custom threshold", () => {
+    assert.equal(isLocalSufficient(2, 2), true);
+    assert.equal(isLocalSufficient(1, 2), false);
   });
 });

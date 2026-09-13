@@ -245,7 +245,7 @@ function SearchContent() {
 
               {!loading && !error && databaseResults.length === 0 && query.trim().length >= 2 ? (
                 <Text className="font-manrope mt-8 text-center text-ink-muted">
-                  No matches in FatSecret or Open Food Facts. Try a different search.
+                  No local matches, and nothing found online either. Try a different search.
                 </Text>
               ) : null}
 

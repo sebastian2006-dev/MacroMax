@@ -9,6 +9,7 @@ import { MacroRing } from "@/components/MacroRing";
 import { MacroProgressBar } from "@/components/MacroProgressBar";
 import { MacroCard } from "@/components/MacroCard";
 import { LowIntakeAlertCard } from "@/components/LowIntakeAlertCard";
+import { LimitAlertCard } from "@/components/LimitAlertCard";
 import { useTabBarClearance } from "@/components/ScrollableTabBar";
 import { useAuth } from "@/src/hooks/useAuth";
 import { useProfile } from "@/src/hooks/useProfile";
@@ -17,6 +18,7 @@ import {
   addDays,
   calculateTotals,
   getGoalTargets,
+  getLimitAlerts,
   getLowIntakeAlerts,
   startOfWeek,
   toLocalDateString,
@@ -58,6 +60,9 @@ function DashboardContent() {
   const totals = useMemo(() => calculateTotals(items), [items]);
   const targets = useMemo(() => getGoalTargets(profile ?? ZERO_PROFILE), [profile]);
   const alerts = useMemo(() => getLowIntakeAlerts(totals, targets), [totals, targets]);
+  // Fats is an upper limit, not a goal, so it is checked separately from the
+  // "eat more" nudges above: staying under it is never worth flagging.
+  const limitAlerts = useMemo(() => getLimitAlerts(totals, targets), [totals, targets]);
 
   const isToday = toLocalDateString(selectedDate) === todayString;
   const hasTargets = targets.calories > 0;
@@ -194,7 +199,7 @@ function DashboardContent() {
           </View>
         ) : null}
 
-        {/* Macros progress: Carbs & Fats (grams) */}
+        {/* Macros progress: Carbs is a goal, Fats is an upper limit */}
         <View className="mb-4 rounded-2xl bg-card p-4" style={SHADOWS.card}>
           <Text className="mb-3 text-base font-manrope-bold text-ink">Today's Macros</Text>
           <MacroProgressBar
@@ -208,6 +213,7 @@ function DashboardContent() {
             current={totals.fats}
             target={targets.fats}
             color={MACRO_COLORS.fats}
+            limit
           />
         </View>
 
@@ -215,6 +221,16 @@ function DashboardContent() {
         <View className="mb-4">
           <MacroCard title="Daily Summary" macros={totals} />
         </View>
+
+        {/* Breached limits first — these ask for action, the nudges below don't */}
+        {limitAlerts.length > 0 ? (
+          <View className="mb-4">
+            <Text className="mb-2 text-base font-manrope-bold text-ink">Watch your limits</Text>
+            {limitAlerts.map((alert) => (
+              <LimitAlertCard key={alert.key} alert={alert} />
+            ))}
+          </View>
+        ) : null}
 
         {/* Gentle nudges when goals are configured */}
         {hasTargets && alerts.length > 0 ? (

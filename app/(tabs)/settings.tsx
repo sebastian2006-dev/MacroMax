@@ -143,10 +143,10 @@ function SettingsContent() {
           </Pressable>
         </View>
 
-        {/* Daily Goal Targets */}
+        {/* Daily Goal Targets + the fat limit */}
         <View className="mb-4 rounded-2xl bg-card p-4" style={SHADOWS.card}>
           <Text className="font-manrope-bold mb-3 text-base text-ink">
-            Daily Goal Targets
+            Daily Goals & Limits
           </Text>
           <Text className="font-manrope mb-3 text-sm text-ink-muted">
             Goals show on the dashboard rings only once set. Leave a field blank
@@ -156,7 +156,15 @@ function SettingsContent() {
           <GoalField label="Calories (kcal)" value={calories} onChange={onCaloriesChange} />
           <GoalField label="Protein (g)" value={protein} onChange={onProteinChange} />
           <GoalField label="Carbs (g)" value={carbs} onChange={onCarbsChange} />
-          <GoalField label="Fats (g)" value={fats} onChange={onFatsChange} />
+
+          <View className="mb-3 mt-1 h-px w-full bg-wash-deep" />
+
+          <Text className="font-manrope mb-3 text-sm text-ink-muted">
+            Fats is an upper limit rather than a goal, so it never nudges you to
+            eat more — you are only warned once you go over it. Set whatever
+            ceiling suits you, or leave it blank to stop tracking it.
+          </Text>
+          <GoalField label="Fats (g) — daily limit" value={fats} onChange={onFatsChange} />
 
           {saved ? (
             <Text className="font-manrope mb-3 text-sm text-primary">

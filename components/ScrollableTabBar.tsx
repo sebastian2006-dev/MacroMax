@@ -1,7 +1,7 @@
 import React, { memo, useCallback, useEffect, useRef } from "react";
 import { Pressable, ScrollView, Text, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
+import type { BottomTabBarProps } from "expo-router/tabs";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "@/src/theme/colors";
 import { SHADOWS } from "@/src/theme/shadows";

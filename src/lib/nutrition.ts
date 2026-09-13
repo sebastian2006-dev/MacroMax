@@ -1,4 +1,4 @@
-import { DailyLog, GoalTargets, LowIntakeAlert, Macros, MealItem, MealType } from "@/src/types";
+import { DailyLog, GoalTargets, LimitAlert, LowIntakeAlert, Macros, MealItem, MealType } from "@/src/types";
 
 export const EMPTY_MACROS: Macros = {
   calories: 0,
@@ -45,12 +45,16 @@ export function getGoalTargets(profile: {
   };
 }
 
+/**
+ * Nudges for macros the user is trying to REACH. Fats is deliberately absent:
+ * it is an upper limit, not a goal, so falling short of it is never a problem
+ * worth flagging (getLimitAlerts covers the opposite check).
+ */
 export function getLowIntakeAlerts(current: Macros, targets: GoalTargets): LowIntakeAlert[] {
   const checks: { key: keyof Macros; label: string; current: number; target: number }[] = [
     { key: "calories", label: "Calories", current: current.calories, target: targets.calories },
     { key: "protein", label: "Protein", current: current.protein, target: targets.protein },
     { key: "carbs", label: "Carbs", current: current.carbs, target: targets.carbs },
-    { key: "fats", label: "Fats", current: current.fats, target: targets.fats },
   ];
 
   return checks
@@ -64,6 +68,33 @@ export function getLowIntakeAlerts(current: Macros, targets: GoalTargets): LowIn
         target: item.target,
         percent,
         message: `${item.label} is at ${percent}% of your daily goal. Consider adding a nutrient-dense meal.`,
+      };
+    });
+}
+
+/**
+ * Warnings for macros the user tracks as an upper LIMIT rather than a goal.
+ * Fires only when the limit is actually set (> 0) and exceeded, so staying
+ * under a fat limit stays completely silent — which is the point of a limit.
+ */
+export function getLimitAlerts(current: Macros, targets: GoalTargets): LimitAlert[] {
+  const limits: { key: keyof Macros; label: string; current: number; limit: number }[] = [
+    { key: "fats", label: "Fats", current: current.fats, limit: targets.fats },
+  ];
+
+  return limits
+    .filter((item) => item.limit > 0 && item.current > item.limit)
+    .map((item) => {
+      const over = item.current - item.limit;
+      return {
+        key: item.key,
+        label: item.label,
+        current: item.current,
+        limit: item.limit,
+        over,
+        // Deliberately not capped at 100 — "140%" is the useful reading here.
+        percent: Math.round((item.current / item.limit) * 100),
+        message: `You are ${Math.round(over)} g over your daily ${item.label.toLowerCase()} limit of ${Math.round(item.limit)} g.`,
       };
     });
 }

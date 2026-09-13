@@ -1,7 +1,7 @@
 /**
  * @file nutrition.test.ts
  * Unit tests for the REAL src/lib/nutrition.ts module — the macro engine
- * behind totals, goals, low-intake alerts and date helpers.
+ * behind totals, goals, low-intake alerts, fat limits and date helpers.
  * Run with: npm test
  */
 import { describe, it } from "node:test";
@@ -14,6 +14,7 @@ import {
   EMPTY_MACROS,
   getDateNDaysAgo,
   getGoalTargets,
+  getLimitAlerts,
   getLowIntakeAlerts,
   groupMealItemsByType,
   scaleMacros,
@@ -154,12 +155,26 @@ describe("getLowIntakeAlerts()", () => {
       0
     ));
 
-  it("fires all four alerts when everything is low", () => {
+  it("fires the three goal alerts when everything is low", () => {
     const alerts = getLowIntakeAlerts(
       { calories: 500, protein: 30, carbs: 50, fats: 10 },
       { calories: 2000, protein: 150, carbs: 250, fats: 70 }
     );
-    assert.equal(alerts.length, 4);
+    assert.equal(alerts.length, 3);
+    assert.deepEqual(
+      alerts.map((a) => a.key),
+      ["calories", "protein", "carbs"]
+    );
+  });
+
+  it("never nags about fats, even when it is far below its limit", () => {
+    // Fats at 0 against a 70 g limit is 0% — well under the 50% goal
+    // threshold — but a limit must never produce an "eat more" nudge.
+    const alerts = getLowIntakeAlerts(
+      { calories: 2000, protein: 150, carbs: 250, fats: 0 },
+      { calories: 2000, protein: 150, carbs: 250, fats: 70 }
+    );
+    assert.deepEqual(alerts, []);
   });
 
   it("alert message contains label and percent", () => {
@@ -168,6 +183,67 @@ describe("getLowIntakeAlerts()", () => {
       { calories: 2000, protein: 0, carbs: 0, fats: 0 }
     );
     assert.ok(a.message.includes("Calories") && a.message.includes("20%"));
+  });
+});
+
+// ── getLimitAlerts ───────────────────────────────────────────────────────────
+describe("getLimitAlerts()", () => {
+  it("stays silent while under the fat limit", () => {
+    const alerts = getLimitAlerts(
+      { calories: 0, protein: 0, carbs: 0, fats: 40 },
+      { calories: 0, protein: 0, carbs: 0, fats: 70 }
+    );
+    assert.deepEqual(alerts, []);
+  });
+
+  it("stays silent when no fat limit is configured", () =>
+    assert.deepEqual(
+      getLimitAlerts(
+        { calories: 0, protein: 0, carbs: 0, fats: 90 },
+        { calories: 0, protein: 0, carbs: 0, fats: 0 }
+      ),
+      []
+    ));
+
+  it("does not fire at exactly the limit", () =>
+    assert.deepEqual(
+      getLimitAlerts(
+        { calories: 0, protein: 0, carbs: 0, fats: 70 },
+        { calories: 0, protein: 0, carbs: 0, fats: 70 }
+      ),
+      []
+    ));
+
+  it("fires once the limit is exceeded, reporting the overshoot", () => {
+    const [alert] = getLimitAlerts(
+      { calories: 0, protein: 0, carbs: 0, fats: 78 },
+      { calories: 0, protein: 0, carbs: 0, fats: 70 }
+    );
+    assert.equal(alert.key, "fats");
+    assert.equal(alert.label, "Fats");
+    assert.equal(alert.limit, 70);
+    assert.equal(alert.current, 78);
+    assert.equal(alert.over, 8);
+    assert.equal(alert.percent, 111);
+    assert.ok(alert.message.includes("8 g") && alert.message.includes("70 g"));
+  });
+
+  it("reports percent above 100 rather than capping it", () => {
+    const [alert] = getLimitAlerts(
+      { calories: 0, protein: 0, carbs: 0, fats: 140 },
+      { calories: 0, protein: 0, carbs: 0, fats: 70 }
+    );
+    assert.equal(alert.percent, 200);
+  });
+
+  it("ignores macros that are goals rather than limits", () => {
+    // Calories, protein and carbs all blow past their targets, but only fats
+    // is treated as a ceiling — so there is nothing to report.
+    const alerts = getLimitAlerts(
+      { calories: 9000, protein: 900, carbs: 900, fats: 10 },
+      { calories: 2000, protein: 150, carbs: 250, fats: 70 }
+    );
+    assert.deepEqual(alerts, []);
   });
 });
 

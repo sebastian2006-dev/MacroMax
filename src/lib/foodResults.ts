@@ -126,6 +126,9 @@ const PREPARED_TERMS = [
 
 export type SearchCategory = "custom" | "basic" | "prepared" | "complex";
 
+/** The three relevancy tiers required by the search spec. */
+export type SearchTier = 1 | 2 | 3;
+
 function normalizeFoodName(name: string): string {
   return name.trim().toLowerCase().replace(/\s+/g, " ");
 }
@@ -154,55 +157,129 @@ export function classifyFoodSearchMatch(name: string, source: SearchResult["sour
   return "basic";
 }
 
-/** Category base weights (higher = surfaced earlier). */
-const CATEGORY_WEIGHT: Record<SearchCategory, number> = {
-  custom: 10000,
-  basic: 300,
-  prepared: 200,
-  complex: 100,
+/** Map the fine-grained category onto the public 1/2/3 tier scale. */
+const CATEGORY_TIER: Record<SearchCategory, SearchTier> = {
+  custom: 1, // pinned above everything — see CATEGORY_RANK
+  basic: 1,
+  prepared: 2,
+  complex: 3,
+};
+
+/** Strict ordering between categories (lower = surfaced earlier). */
+const CATEGORY_RANK: Record<SearchCategory, number> = {
+  custom: 0, // user's own saved dishes always win
+  basic: 1,
+  prepared: 2,
+  complex: 3,
 };
 
 /**
- * Rank search results by relevance: basic ingredients first, prepared
- * variations second, complex dishes last. Within a category, exact /
- * prefix / substring phrase matches win, raw beats cooked, and the original
- * provider order is the stable tie-break.
+ * Public tier for a food name: 1 = raw/basic ingredient, 2 = cooked/prepared
+ * variation of it, 3 = complex multi-ingredient dish. Saved custom dishes map
+ * to Tier 1 but are pinned ahead of the whole list by {@link sortSearchResults}.
  */
-export function sortFoodSearchResults(results: SearchResult[], query: string): SearchResult[] {
+export function getSearchTier(name: string, source: SearchResult["source"]): SearchTier {
+  return CATEGORY_TIER[classifyFoodSearchMatch(name, source)];
+}
+
+/**
+ * Relevance bonus WITHIN a tier (higher = shown earlier). Bounded (max ~360)
+ * and only ever compared against items in the SAME tier, so it can never
+ * promote an item across a tier.
+ */
+function scoreWithinTier(
+  normalizedName: string,
+  result: SearchResult,
+  query: string,
+  tokens: string[]
+): number {
+  let score = 0;
+
+  // Phrase-match quality: exact > prefix > substring.
+  if (query && normalizedName === query) {
+    score += 300;
+  } else if (query && normalizedName.startsWith(query)) {
+    score += 200;
+  } else if (query && normalizedName.includes(query)) {
+    score += 100;
+  }
+  // Every query token appearing in the name boosts multi-word searches.
+  if (tokens.length > 1 && tokens.every((token) => normalizedName.includes(token))) {
+    score += 50;
+  }
+  // Within a tier, keep the raw form ahead of the cooked/prepared one.
+  if (/\braw\b/.test(normalizedName)) {
+    score += 6;
+  } else if (/\bcooked\b/.test(normalizedName)) {
+    score += 2;
+  }
+  // Prefer ingredient databases over packaged-product listings.
+  if (result.source === "fatsecret") {
+    score += 4;
+  }
+
+  return score;
+}
+
+/**
+ * Rank search results by relevance with a STRICT 3-tier hierarchy:
+ *
+ *   Tier 1 — exact keyword matches & raw, single basic ingredients
+ *            (Chicken breast raw, Chicken raw leg piece)
+ *   Tier 2 — cooked/prepared variations of that ingredient
+ *            (Chicken breast cooked, Grilled chicken wings)
+ *   Tier 3 — complex, multi-ingredient dishes containing the keyword
+ *            (Chicken curry, Butter chicken)
+ *
+ * Tiers are enforced BEFORE the within-tier score, so every Tier-1 item always
+ * outranks every Tier-2 item no matter how strong the lower-tier match is. The
+ * original provider order is the final, stable tie-break. Saved custom dishes
+ * are pinned above Tier 1.
+ *
+ * Pure and side-effect free — safe to run over static-DB and API results alike.
+ */
+export function sortSearchResults(results: SearchResult[], query: string): SearchResult[] {
   const q = normalizeFoodName(query);
   const tokens = q.split(" ").filter(Boolean);
 
   const scored = results.map((result, index) => {
     const name = normalizeFoodName(result.name);
     const category = classifyFoodSearchMatch(result.name, result.source);
-    let score = CATEGORY_WEIGHT[category];
-
-    // Phrase-match quality inside the category.
-    if (q && name === q) {
-      score += 100;
-    } else if (q && name.startsWith(q)) {
-      score += 60;
-    } else if (q && name.includes(q)) {
-      score += 30;
-    }
-    // Every query token appearing in the name boosts multi-word searches.
-    if (tokens.length > 1 && tokens.every((token) => name.includes(token))) {
-      score += 20;
-    }
-    // Within "basic", keep raw ahead of cooked.
-    if (name.includes("raw")) {
-      score += 6;
-    } else if (name.includes("cooked")) {
-      score += 2;
-    }
-    // Prefer ingredient databases over packaged-product listings.
-    if (result.source === "fatsecret") {
-      score += 4;
-    }
-
-    return { result, score, index };
+    return {
+      result,
+      rank: CATEGORY_RANK[category],
+      score: scoreWithinTier(name, result, q, tokens),
+      index,
+    };
   });
 
-  scored.sort((a, b) => b.score - a.score || a.index - b.index);
+  scored.sort((a, b) => a.rank - b.rank || b.score - a.score || a.index - b.index);
   return scored.map((entry) => entry.result);
+}
+
+/** @deprecated Renamed to {@link sortSearchResults}. Kept for back-compat. */
+export const sortFoodSearchResults = sortSearchResults;
+
+// ---------------------------------------------------------------------------
+// Local-first fetching policy
+//
+// The pipeline queries the on-device layer (saved dishes + food cache +
+// built-in reference list) FIRST. It only reaches for the remote APIs when
+// that layer comes back with too few matches to be useful — "zero or
+// insufficient" results.
+// ---------------------------------------------------------------------------
+
+/**
+ * How many local matches are considered "enough" to skip the remote APIs.
+ * Tuned so a well-covered local query (e.g. "chicken" against the built-in
+ * list) stays fully offline, while a sparse one still tops up from providers.
+ */
+export const LOCAL_SUFFICIENCY_THRESHOLD = 5;
+
+/** True when the local layer returned enough matches to skip the APIs. */
+export function isLocalSufficient(
+  localMatchCount: number,
+  threshold: number = LOCAL_SUFFICIENCY_THRESHOLD
+): boolean {
+  return localMatchCount >= threshold;
 }
