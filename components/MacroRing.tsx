@@ -1,13 +1,9 @@
-import React, { useEffect, useRef } from "react";
-import { Animated, Easing, StyleSheet, Text, View } from "react-native";
+import React from "react";
+import { StyleSheet, Text, View } from "react-native";
 import Svg, { Circle, G } from "react-native-svg";
 import { COLORS, MACRO_TRACKS } from "@/src/theme/colors";
 import { SHADOWS } from "@/src/theme/shadows";
 import { TILE_MAX_FONT_SCALE } from "@/src/theme/typography";
-
-// React Native's built-in Animated API (no reanimated dependency) — works
-// identically on iOS, Android and web with react-native-svg.
-const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 /** Soft tint used for the empty ring track when the color prop isn't a macro color. */
 const FALLBACK_TRACK = "#EEF1F7";
@@ -42,7 +38,7 @@ interface MacroRingProps {
 }
 
 /**
- * Animated circular progress ring (donut) for a daily macro total.
+ * Circular progress ring (donut) for a daily macro total.
  * When no goal target is configured, the ring renders as a neutral full ring
  * with the actual count in the middle — no empty progress, no error clutter.
  *
@@ -68,27 +64,15 @@ export const MacroRing = React.memo(function MacroRing({
   const progress = hasTarget ? Math.min(1, Math.max(0, value / target)) : 0;
   const trackColor = trackForColor(color);
 
-  const progressAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    progressAnim.stopAnimation();
-    progressAnim.setValue(0);
-    const animation = Animated.timing(progressAnim, {
-      toValue: progress,
-      duration: 900,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: false, // strokeDashoffset is not a native-driver style
-    });
-    animation.start();
-    return () => {
-      progressAnim.stopAnimation();
-    };
-  }, [progress, progressAnim]);
-
-  const strokeDashoffset = progressAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [circumference, 0],
-  });
+  // The arc is rendered DIRECTLY from props, with no Animated layer. The
+  // previous build animated it with the legacy RN Animated API
+  // (`useNativeDriver: false`), which drives react-native-svg nodes through
+  // setNativeProps — a no-op on the new architecture (Fabric) on Android 12.
+  // The `setValue(0)` reset therefore applied instantly while the 900ms fill
+  // never painted, so every day switch visibly snapped the rings to empty —
+  // the "graphs glitch out" bug captured in the user's screen recording.
+  // Instant, prop-driven updates are glitch-free by construction.
+  const strokeDashoffset = circumference * (1 - progress);
 
   return (
     <View className="flex-1 items-center rounded-2xl bg-card p-4" style={SHADOWS.card}>
@@ -104,7 +88,7 @@ export const MacroRing = React.memo(function MacroRing({
           />
           {hasTarget ? (
             <G rotation={-90} origin={`${size / 2}, ${size / 2}`}>
-              <AnimatedCircle
+              <Circle
                 cx={size / 2}
                 cy={size / 2}
                 r={radius}

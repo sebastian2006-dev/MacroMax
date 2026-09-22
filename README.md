@@ -7,7 +7,7 @@ Built natively with React Native (Expo), TypeScript, and NativeWind — no accou
 ![Platform](https://img.shields.io/badge/platform-Android-3DDC84?logo=android&logoColor=white)
 ![Expo](https://img.shields.io/badge/Expo-SDK%2057-000020?logo=expo&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-219%2F219%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-226%2F226%20passing-brightgreen)
 
 ---
 
@@ -128,7 +128,7 @@ cd android && ./gradlew assembleRelease
 
 ## Testing
 
-**Status: ✅ 219 / 219 unit tests passing** (Node built-in test runner via `tsx`), plus a strict `tsc --noEmit` type-check. Tests exercise the **real `src/lib` modules** (pure logic only — no native/network dependencies), so they verify actual app behaviour rather than copies of it.
+**Status: ✅ 226 / 226 unit tests passing** (Node built-in test runner via `tsx`), plus a strict `tsc --noEmit` type-check. Tests exercise the **real `src/lib` modules** (pure logic only — no native/network dependencies), so they verify actual app behaviour rather than copies of it.
 
 ```bash
 npm test           # run all unit tests
@@ -149,8 +149,9 @@ GitHub Actions (`.github/workflows/ci.yml`) runs both jobs on every push to `mai
 | FatSecret mapping | `test/fatSecret.test.ts` | 14 | Description parsing (`Per 100g - …`), `100 g`/default serving → per-100g derivation, single-serving JSON quirk, ml portions (1 ml ≈ 1 g), portion cap/dedupe, rejection of unusable foods |
 | Sync-status store | `test/syncStatus.test.ts` | 12 | Header pill modes: online / local / cached / mixed / offline / idle, pub/sub notifications & unsubscribing |
 | Open Food Facts mapping | `test/openFoodFacts.test.ts` | 10 | Per-100g mapping, kJ→kcal fallback, per-serving → per-100g scaling, standard portions from `serving_size`/`serving_quantity`, 2-dp precision, rejection of unusable products |
+| Tab-bar layout | `test/tabBarLayout.test.ts` | 7 | Navigation geometry: slot width / bar height scale (clamped) with the OS font scale, and the invariant that every tab label fits its slot in full at 100–300% font scale |
 
-While building this suite, the tests surfaced and fixed two real defects:
+While building this suite, the tests surfaced and fixed three real defects:
 - A missing export (`mapFatSecretSearchItem`)
 - A **cache-eligibility bug** in the search pipeline — results were filtered against the whole result object instead of its `source`, so every remote result was silently skipped when writing the offline cache
 - A **FatSecret description parser bug** — calories in the `Per 100g - Calories: …` segment were parsed as 0 because of an over-anchored regex

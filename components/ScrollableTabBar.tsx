@@ -64,6 +64,11 @@ export const ScrollableTabBar = memo(function ScrollableTabBar({
   const focusedIndex = state.index;
 
   const scrollFocusedIntoView = useCallback(() => {
+    // First-frame geometry is sometimes reported as 0; skip the scroll in
+    // that case — onContentSizeChange fires again once real sizes arrive.
+    if (itemWidth <= 0 || windowWidth <= 0) {
+      return;
+    }
     const offset = Math.max(0, focusedIndex * itemWidth - (windowWidth - itemWidth) / 2);
     scrollRef.current?.scrollTo({ x: offset, animated: true });
   }, [focusedIndex, itemWidth, windowWidth]);

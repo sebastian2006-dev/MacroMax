@@ -4,6 +4,7 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { RequireAuth } from "@/components/RequireAuth";
 import { AppHeader } from "@/components/AppHeader";
+import { WeekStrip } from "@/components/WeekStrip";
 import { MealSlot } from "@/components/MealSlot";
 import { useTabBarClearance } from "@/components/ScrollableTabBar";
 import { useAuth } from "@/src/hooks/useAuth";
@@ -19,6 +20,7 @@ import { COLORS, MACRO_COLORS } from "@/src/theme/colors";
 import { SHADOWS } from "@/src/theme/shadows";
 import { MealType } from "@/src/types";
 
+/** Fixed display order of the meal slots on the Daily Log. */
 const MEAL_ORDER: MealType[] = ["Breakfast", "Lunch", "Dinner", "Snacks/Extra"];
 
 function LogContent() {
@@ -92,50 +94,13 @@ function LogContent() {
           </Text>
         </View>
 
-        {/* Week strip — 7 equal-width day chips filling the screen width */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          className="mb-4"
-          contentContainerStyle={{ flexGrow: 1, columnGap: 8 }}
-        >
-          {weekDates.map((date) => {
-            const dateString = toLocalDateString(date);
-            const isSelected = toLocalDateString(selectedDate) === dateString;
-            return (
-              <Pressable
-                key={dateString}
-                onPress={() => setSelectedDate(date)}
-                className={`flex-1 items-center rounded-2xl px-1 py-2 ${
-                  isSelected ? "bg-primary" : "bg-card"
-                }`}
-              >
-                <Text
-                  className={`text-center text-[11px] font-manrope ${
-                    isSelected ? "text-card" : "text-ink-muted"
-                  }`}
-                >
-                  {date.toLocaleDateString("en-US", { weekday: "short" })}
-                </Text>
-                <Text
-                  className={`text-center text-sm font-manrope-bold ${
-                    isSelected ? "text-card" : "text-ink"
-                  }`}
-                >
-                  {date.getDate()}
-                </Text>
-              </Pressable>
-            );
-          })}
-          {!isToday ? (
-            <Pressable
-              onPress={() => setSelectedDate(new Date())}
-              className="items-center justify-center rounded-2xl bg-primary-soft px-3 py-2"
-            >
-              <Text className="text-[11px] font-manrope-semibold text-primary">Today</Text>
-            </Pressable>
-          ) : null}
-        </ScrollView>
+        {/* Week strip — shared, uniform-height day chips (see WeekStrip) */}
+        <WeekStrip
+          weekDates={weekDates}
+          selectedDate={selectedDate}
+          onSelectDate={setSelectedDate}
+          isToday={isToday}
+        />
 
         {/* Totals summary card */}
         <View className="mb-4 rounded-2xl bg-card p-4" style={SHADOWS.card}>

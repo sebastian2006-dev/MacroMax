@@ -5,6 +5,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { RequireAuth } from "@/components/RequireAuth";
 import { AppHeader } from "@/components/AppHeader";
+import { WeekStrip } from "@/components/WeekStrip";
 import { MacroRing } from "@/components/MacroRing";
 import { MacroProgressBar } from "@/components/MacroProgressBar";
 import { MacroCard } from "@/components/MacroCard";
@@ -110,11 +111,9 @@ function DashboardContent() {
         showsVerticalScrollIndicator={false}
       >
         {/* Greeting + selected date. The date line carries an explicit line
-            height (Android crops "Sunday, September 13" descenders when a custom
-            font's line box is tighter than its metrics) and the block's bottom
-            margin is split with the strip's own top margin below, so the date
-            can never be crowded or clipped by the calendar bar. */}
-        <View className="mb-3">
+            height because Android crops "Sunday, September 13" descenders when
+            a custom font's line box is tighter than its metrics. */}
+        <View className="mb-4">
           <Text className="text-2xl font-manrope-extrabold text-ink">
             {name ? `Hi, ${name}` : "Today"}
           </Text>
@@ -127,50 +126,13 @@ function DashboardContent() {
           </Text>
         </View>
 
-        {/* Week strip — 7 equal-width day chips filling the screen width */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          className="mb-4 mt-1"
-          contentContainerStyle={{ flexGrow: 1, columnGap: 8 }}
-        >
-          {weekDates.map((date) => {
-            const dateString = toLocalDateString(date);
-            const isSelected = toLocalDateString(selectedDate) === dateString;
-            return (
-              <Pressable
-                key={dateString}
-                onPress={() => setSelectedDate(date)}
-                className={`flex-1 items-center rounded-2xl px-1 py-2 ${
-                  isSelected ? "bg-primary" : "bg-card"
-                }`}
-              >
-                <Text
-                  className={`text-center text-[11px] font-manrope ${
-                    isSelected ? "text-card" : "text-ink-muted"
-                  }`}
-                >
-                  {date.toLocaleDateString("en-US", { weekday: "short" })}
-                </Text>
-                <Text
-                  className={`text-center text-sm font-manrope-bold ${
-                    isSelected ? "text-card" : "text-ink"
-                  }`}
-                >
-                  {date.getDate()}
-                </Text>
-              </Pressable>
-            );
-          })}
-          {!isToday ? (
-            <Pressable
-              onPress={() => setSelectedDate(new Date())}
-              className="items-center justify-center rounded-2xl bg-primary-soft px-3 py-2"
-            >
-              <Text className="text-[11px] font-manrope-semibold text-primary">Today</Text>
-            </Pressable>
-          ) : null}
-        </ScrollView>
+        {/* Week strip — shared, uniform-height day chips (see WeekStrip) */}
+        <WeekStrip
+          weekDates={weekDates}
+          selectedDate={selectedDate}
+          onSelectDate={setSelectedDate}
+          isToday={isToday}
+        />
 
         {/* Rings: Calories + Protein */}
         <View className="mb-4 flex-row">

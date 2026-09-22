@@ -14,6 +14,9 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
+        // Keep the ribbon pinned even while the soft keyboard is open on
+        // Android — an adjustResize/edge-to-edge race could leave it hidden.
+        tabBarHideOnKeyboard: false,
       }}
       tabBar={(props) => <ScrollableTabBar {...props} />}
     >

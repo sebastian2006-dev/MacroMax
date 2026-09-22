@@ -1,7 +1,7 @@
 import React, { useEffect } from "react";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { SafeAreaProvider } from "react-native-safe-area-context";
+import { initialWindowMetrics, SafeAreaProvider } from "react-native-safe-area-context";
 import {
   Manrope_400Regular,
   Manrope_500Medium,
@@ -32,7 +32,13 @@ export default function RootLayout() {
   }, [fontError]);
 
   return (
-    <SafeAreaProvider>
+    /*
+      initialMetrics seeds the provider with the real window insets from the
+      first frame. Without it, Android (edge-to-edge) reports a zero bottom
+      inset on the initial render and only corrects it later — which let the
+      custom tab bar paint under/over the system gesture bar and glitch.
+    */
+    <SafeAreaProvider initialMetrics={initialWindowMetrics}>
       <StatusBar style="dark" />
       <Stack
         screenOptions={{

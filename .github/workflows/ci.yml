@@ -7,13 +7,13 @@
 #
 # Jobs
 #   1. lint-typecheck  — TypeScript strict type-checking (tsc --noEmit)
-#   2. unit-tests      — 219 pure unit tests against the real src/lib modules
+#   2. unit-tests      — 226 pure unit tests against the real src/lib modules
 #                        (Node built-in runner via tsx). Suites: nutrition
 #                        (incl. fat limit vs goal semantics), servingUnits,
 #                        fallbackFoods, debounce, food-search pipeline (incl.
 #                        strict tier sorting & local-first), Open Food Facts
 #                        mapping, FatSecret mapping, sync-status store, HTTP
-#                        helpers.
+#                        helpers, tab-bar layout.
 # ─────────────────────────────────────────────────────────────────────────────
 name: CI
 
@@ -55,7 +55,7 @@ jobs:
 
   # ── Job 2: Unit tests ──────────────────────────────────────────────────────
   unit-tests:
-    name: "Unit Tests (219 tests)"
+    name: "Unit Tests (226 tests)"
     runs-on: ubuntu-latest
 
     steps:

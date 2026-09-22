@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -9,6 +9,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AppHeader } from "@/components/AppHeader";
@@ -56,6 +57,11 @@ function ingredientServingState(ingredient: DraftIngredient): ServingState {
   };
 }
 
+/** Compact single-line macro summary shared by the save button & saved cards. */
+function macroSummary(calories: number, protein: number, carbs: number, fats: number): string {
+  return `${Math.round(calories)} kcal · ${Math.round(protein)}g P · ${Math.round(carbs)}g C · ${Math.round(fats)}g F`;
+}
+
 function RecipeContent() {
   const { userId } = useAuth();
   const { addMealItem } = useDailyLog(userId);
@@ -75,10 +81,21 @@ function RecipeContent() {
   const [serving, setServing] = useState<ServingState>(DEFAULT_SERVING_STATE);
   // Lets the user dismiss the sliding results window; a new query re-opens it.
   const [resultsDismissed, setResultsDismissed] = useState(false);
+  // Brief ✓ feedback on the saved-dish card whose "+" was just tapped.
+  const [addedRecipeId, setAddedRecipeId] = useState<string | null>(null);
+  const addedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setResultsDismissed(false);
   }, [query]);
+
+  useEffect(() => {
+    return () => {
+      if (addedTimer.current) {
+        clearTimeout(addedTimer.current);
+      }
+    };
+  }, []);
 
   // Sliding window visibility: only while a search is active and the user
   // has not dismissed it (loading shows the spinner inside the window).
@@ -189,6 +206,28 @@ function RecipeContent() {
     }
   }
 
+  /** Logs the whole saved batch to today and flashes a ✓ on the card. */
+  async function handleAddToday(recipe: CustomRecipe) {
+    const added = await addMealItem({
+      meal_type: "Snacks/Extra",
+      item_name: recipe.recipe_name,
+      serving_size: "1 recipe",
+      calories: Math.round(recipe.total_calories),
+      protein: Math.round(recipe.total_protein),
+      carbs: Math.round(recipe.total_carbs),
+      fats: Math.round(recipe.total_fats),
+    });
+    if (!added) {
+      return;
+    }
+
+    setAddedRecipeId(recipe.id);
+    if (addedTimer.current) {
+      clearTimeout(addedTimer.current);
+    }
+    addedTimer.current = setTimeout(() => setAddedRecipeId(null), 1400);
+  }
+
   return (
     <SafeAreaView className="flex-1 bg-surface" edges={["left", "right"]}>
       <AppHeader />
@@ -200,145 +239,158 @@ function RecipeContent() {
           className="flex-1"
           contentContainerStyle={{ padding: 16, paddingBottom: clearance }}
         >
-        <View className="mb-4">
-          <Text className="font-manrope-extrabold text-2xl text-ink">Custom Dish</Text>
-          <Text className="font-manrope mt-1 text-sm text-ink-muted">
-            Name it, weigh it, save it — log the whole batch anytime
-          </Text>
-        </View>
-
-        {/* Builder */}
-        <View className="mb-4 rounded-2xl bg-card p-4" style={SHADOWS.card}>
-          <TextInput
-            value={recipeName}
-            onChangeText={setRecipeName}
-            placeholder="Dish name (e.g. 2 eggs + 300 g rice)"
-            placeholderTextColor={COLORS.inkFaint}
-            className="font-manrope mb-4 rounded-3xl bg-wash px-4 py-3 text-ink"
-          />
-
-          <Text className="font-manrope-semibold mb-1 text-sm text-ink-muted">
-            Search ingredients
-          </Text>
-          <SearchBar
-            value={query}
-            onChangeText={setQuery}
-            placeholder="Search ingredient (FatSecret / Open Food Facts)"
-          />
-          <Text className="font-manrope mt-1 text-xs text-ink-faint">
-            Results slide up in a window — tap one to set its serving.
-          </Text>
-
-          {selected ? (
-            <View className="mt-3 mb-4 rounded-2xl bg-wash p-3">
-              <Text className="font-manrope-bold mb-3 text-sm text-ink">
-                {selected.name}
-              </Text>
-              <ServingInput food={selected} state={serving} onChange={setServing} />
-              <Pressable
-                onPress={addIngredient}
-                className="mt-3 rounded-3xl bg-primary py-3"
-              >
-                <Text className="font-manrope-bold text-center text-card">
-                  Add Ingredient
-                </Text>
-              </Pressable>
-            </View>
-          ) : null}
-
-          {ingredients.length > 0 ? (
-            <View className="mb-4">
-              {ingredients.map((ingredient, index) => {
-                const macros = scaleMacros(ingredient.food, ingredient.quantityGrams);
-                return (
-                  <View
-                    key={`${ingredient.food.id}-${index}`}
-                    className="mb-1 flex-row items-center justify-between rounded-xl bg-wash px-3 py-2"
-                  >
-                    <View className="flex-1 pr-3">
-                      <Text className="font-manrope text-sm text-ink" numberOfLines={1}>
-                        {`${ingredient.food.name} · ${formatServingSize(
-                          ingredientServingState(ingredient)
-                        )} (~${Math.round(ingredient.quantityGrams)}g)`}
-                      </Text>
-                      <Text className="font-manrope text-xs text-ink-faint">
-                        {Math.round(macros.calories)} kcal · {Math.round(macros.protein)}g P
-                      </Text>
-                    </View>
-                    <Pressable
-                      onPress={() => removeIngredient(index)}
-                      hitSlop={8}
-                      className="rounded-lg bg-danger-soft px-2 py-1"
-                    >
-                      <Text className="font-manrope-bold text-danger">✕</Text>
-                    </Pressable>
-                  </View>
-                );
-              })}
-            </View>
-          ) : null}
-
-          <View className="mb-3 flex-row items-center justify-between rounded-2xl bg-primary-soft px-4 py-3">
-            <Text className="font-manrope-semibold text-sm text-ink-muted">Totals</Text>
-            <Text className="font-manrope-semibold text-sm text-ink">
-              {Math.round(totals.calories)} kcal · {Math.round(totals.protein)}g P ·{" "}
-              {Math.round(totals.carbs)}g C · {Math.round(totals.fats)}g F
+          <View className="mb-4">
+            <Text className="text-2xl font-manrope-extrabold text-ink">Custom Dish</Text>
+            <Text className="mt-1 text-sm font-manrope text-ink-muted">
+              Build once — log the whole batch anytime
             </Text>
           </View>
 
-          <Pressable
-            onPress={() => void saveRecipe()}
-            disabled={saving || !recipeName.trim() || ingredients.length === 0}
-            className="rounded-3xl bg-primary py-3.5 disabled:opacity-50"
-          >
-            {saving ? (
-              <ActivityIndicator color={COLORS.card} />
-            ) : (
-              <Text className="font-manrope-bold text-center text-card">Save Dish</Text>
-            )}
-          </Pressable>
-        </View>
+          {/* Builder — one cohesive form card */}
+          <View className="mb-5 rounded-3xl bg-card p-4" style={SHADOWS.card}>
+            <TextInput
+              value={recipeName}
+              onChangeText={setRecipeName}
+              placeholder="Dish name (e.g. 2 eggs + 300 g rice)"
+              placeholderTextColor={COLORS.inkFaint}
+              className="mb-3 rounded-3xl bg-wash px-4 py-3 font-manrope text-ink"
+            />
 
-        {/* Saved dishes */}
-        <Text className="font-manrope-bold mb-2 text-lg text-ink">Saved Dishes</Text>
-        {savedRecipes.length === 0 ? (
-          <Text className="font-manrope text-ink-faint">
-            No custom dishes yet. Build your first above.
-          </Text>
-        ) : (
-          savedRecipes.map((recipe) => (
-            <View key={recipe.id} className="mb-2 rounded-2xl bg-card p-4" style={SHADOWS.card}>
-              <Text className="font-manrope-bold text-base text-ink">
-                {recipe.recipe_name}
+            <SearchBar
+              value={query}
+              onChangeText={setQuery}
+              placeholder="Search ingredients (FatSecret / Open Food Facts)"
+            />
+
+            {selected ? (
+              <View className="mb-3 rounded-2xl bg-wash p-3">
+                <Text className="mb-3 text-sm font-manrope-bold text-ink">{selected.name}</Text>
+                <ServingInput food={selected} state={serving} onChange={setServing} />
+                <Pressable
+                  onPress={addIngredient}
+                  className="mt-3 rounded-3xl bg-primary py-2.5"
+                >
+                  <Text className="text-center font-manrope-bold text-card">
+                    Add Ingredient
+                  </Text>
+                </Pressable>
+              </View>
+            ) : null}
+
+            {ingredients.length > 0 ? (
+              <View className="mb-4">
+                {ingredients.map((ingredient, index) => {
+                  const macros = scaleMacros(ingredient.food, ingredient.quantityGrams);
+                  return (
+                    <View
+                      key={`${ingredient.food.id}-${index}`}
+                      className="mb-1 flex-row items-center justify-between rounded-xl bg-wash px-3 py-2"
+                    >
+                      <View className="flex-1 pr-3">
+                        <Text className="text-sm font-manrope text-ink" numberOfLines={1}>
+                          {`${ingredient.food.name} · ${formatServingSize(
+                            ingredientServingState(ingredient)
+                          )} (~${Math.round(ingredient.quantityGrams)}g)`}
+                        </Text>
+                        <Text className="text-xs font-manrope text-ink-faint">
+                          {Math.round(macros.calories)} kcal · {Math.round(macros.protein)}g P
+                        </Text>
+                      </View>
+                      <Pressable
+                        onPress={() => removeIngredient(index)}
+                        hitSlop={8}
+                        accessibilityLabel={`Remove ${ingredient.food.name}`}
+                        className="rounded-lg bg-danger-soft px-2 py-1"
+                      >
+                        <Text className="font-manrope-bold text-danger">✕</Text>
+                      </Pressable>
+                    </View>
+                  );
+                })}
+              </View>
+            ) : selected ? null : (
+              <Text className="mb-3 text-xs font-manrope text-ink-faint">
+                Search an ingredient above to start building your dish.
               </Text>
-              <Text className="font-manrope text-sm text-ink-muted">
-                {Math.round(recipe.total_calories)} kcal · {Math.round(recipe.total_protein)}g
-                P · {Math.round(recipe.total_carbs)}g C · {Math.round(recipe.total_fats)}g F
-              </Text>
-              <Text className="font-manrope mt-1 text-xs text-ink-faint">
-                Full saved batch · tap to log to today's log
-              </Text>
-              <Pressable
-                onPress={() =>
-                  void addMealItem({
-                    meal_type: "Snacks/Extra",
-                    item_name: recipe.recipe_name,
-                    serving_size: "1 recipe",
-                    calories: Math.round(recipe.total_calories),
-                    protein: Math.round(recipe.total_protein),
-                    carbs: Math.round(recipe.total_carbs),
-                    fats: Math.round(recipe.total_fats),
-                  })
-                }
-                className="mt-2 rounded-3xl bg-primary py-2.5"
-              >
-                <Text className="font-manrope-bold text-center text-sm text-card">
-                  Add to Today
+            )}
+
+            {/* Save button doubles as the totals bar */}
+            <Pressable
+              onPress={() => void saveRecipe()}
+              disabled={saving || !recipeName.trim() || ingredients.length === 0}
+              accessibilityLabel={
+                ingredients.length > 0
+                  ? `Save dish, ${macroSummary(
+                      totals.calories,
+                      totals.protein,
+                      totals.carbs,
+                      totals.fats
+                    )}`
+                  : "Save dish"
+              }
+              className="flex-row items-center justify-between rounded-3xl bg-primary px-5 py-3.5 disabled:opacity-50"
+            >
+              {saving ? (
+                <ActivityIndicator color={COLORS.card} />
+              ) : (
+                <Text className="font-manrope-bold text-card">Save Dish</Text>
+              )}
+              {!saving && ingredients.length > 0 ? (
+                <Text className="ml-3 shrink text-xs font-manrope-semibold text-primary-soft">
+                  {macroSummary(totals.calories, totals.protein, totals.carbs, totals.fats)}
                 </Text>
-              </Pressable>
-            </View>
-          ))
-        )}
+              ) : null}
+            </Pressable>
+          </View>
+
+          {/* Saved dishes — compact cards, one-tap "+" to log today */}
+          <Text className="mb-2 text-lg font-manrope-bold text-ink">Saved Dishes</Text>
+          {savedRecipes.length === 0 ? (
+            <Text className="font-manrope text-ink-faint">
+              No custom dishes yet. Build your first above.
+            </Text>
+          ) : (
+            savedRecipes.map((recipe) => {
+              const justAdded = addedRecipeId === recipe.id;
+              return (
+                <View
+                  key={recipe.id}
+                  className="mb-2 flex-row items-center rounded-2xl bg-card p-4"
+                  style={SHADOWS.card}
+                >
+                  <View className="flex-1 pr-3">
+                    <Text className="text-sm font-manrope-bold text-ink" numberOfLines={1}>
+                      {recipe.recipe_name}
+                    </Text>
+                    <Text className="mt-0.5 text-xs font-manrope text-ink-muted" numberOfLines={1}>
+                      {macroSummary(
+                        recipe.total_calories,
+                        recipe.total_protein,
+                        recipe.total_carbs,
+                        recipe.total_fats
+                      )}{" "}
+                      · full batch
+                    </Text>
+                  </View>
+                  <Pressable
+                    onPress={() => void handleAddToday(recipe)}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Add ${recipe.recipe_name} to today's log`}
+                    className={`h-10 w-10 items-center justify-center rounded-full ${
+                      justAdded ? "bg-primary" : "bg-primary-soft"
+                    }`}
+                  >
+                    <Ionicons
+                      name={justAdded ? "checkmark" : "add"}
+                      size={20}
+                      color={justAdded ? COLORS.card : COLORS.primary}
+                    />
+                  </Pressable>
+                </View>
+              );
+            })
+          )}
         </ScrollView>
 
         {/* Sliding window with ranked ingredient results */}

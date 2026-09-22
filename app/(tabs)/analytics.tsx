@@ -1,10 +1,12 @@
 import React, { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Dimensions,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Pressable,
   ScrollView,
   Text,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { LineChart } from "react-native-chart-kit";
@@ -22,6 +24,7 @@ import { SHADOWS } from "@/src/theme/shadows";
 import { DailyLog } from "@/src/types";
 
 type ViewMode = "week" | "month";
+type BucketMetric = "calories" | "protein" | "carbs" | "fats";
 
 interface Bucket {
   key: string;
@@ -109,68 +112,27 @@ function makeChartConfig(lineColor: string) {
   };
 }
 
-function lineColor(lineColor: string) {
-  return (opacity = 1) => rgba(lineColor, opacity);
-}
-
-// Macro line colors follow the Vitality palette: Calories = primary green,
-// Protein = secondary blue, Fat = tertiary orange.
+// Trend line colors follow the Vitality palette: Calories = primary green,
+// Protein = secondary blue, Carbs & Fat = tertiary orange.
 const LINE_COLORS = {
   calories: CHART_COLORS.lineCalories,
   protein: CHART_COLORS.lineProtein,
+  carbs: COLORS.tertiary,
   fats: COLORS.tertiary,
 };
 
-function MetricCard({
-  title,
-  color,
-  chartData,
-  width,
-  metric,
-}: {
-  title: string;
-  color: string;
-  chartData: Bucket[];
-  width: number;
-  metric: "calories" | "protein" | "fats";
-}) {
-  return (
-    <View className="mb-4 rounded-2xl bg-card p-4" style={SHADOWS.card}>
-      <View className="mb-3 flex-row items-center">
-        <View className="mr-2 h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
-        <Text className="font-manrope-bold flex-1 text-base text-ink">{title}</Text>
-        <Text className="font-manrope text-xs text-ink-muted">
-          {Math.round(chartData[chartData.length - 1][metric])} {metric === "calories" ? "kcal" : "g"}
-        </Text>
-      </View>
-      <LineChart
-        data={{
-          labels: chartData.map((item) => item.label),
-          datasets: [
-            {
-              data: chartData.map((item) => Math.round(item[metric])),
-              color: lineColor(color),
-              strokeWidth: 2,
-            },
-          ],
-        }}
-        width={width}
-        height={200}
-        chartConfig={makeChartConfig(color)}
-        bezier
-        style={{ borderRadius: 16 }}
-      />
-    </View>
-  );
-}
-
-function MacroSplitCard({ bucket, periodLabel }: { bucket: Bucket; periodLabel: string }) {
+/**
+ * Hero card: the macro split donut with the period's calories in its centre
+ * and the protein/carbs/fat breakdown as a compact legend. This replaces the
+ * three separate stat tiles + donut + legend stack of the previous build.
+ */
+function SplitHeroCard({ bucket, periodLabel }: { bucket: Bucket; periodLabel: string }) {
   const totalGrams = bucket.protein + bucket.carbs + bucket.fats;
   const percent = (value: number) => (totalGrams > 0 ? Math.round((value / totalGrams) * 100) : 0);
 
   // Donut colors (product preference for the macro split ring):
   // Protein = red, Carbs = green, Fat = yellow. This is a chart-only
-  // override — the trend lines & stat tiles keep the Vitality Core colors.
+  // override — the trend lines keep the Vitality Core colors.
   const segments: MacroDonutSegment[] = [
     { key: "protein", label: "Protein", value: bucket.protein, color: "#DC2626" },
     { key: "carbs", label: "Carbs", value: bucket.carbs, color: COLORS.primary },
@@ -178,49 +140,128 @@ function MacroSplitCard({ bucket, periodLabel }: { bucket: Bucket; periodLabel: 
   ];
 
   return (
-    <View className="mb-4 rounded-2xl bg-card p-4" style={SHADOWS.card}>
-      <Text className="font-manrope-bold mb-3 text-base text-ink">Macro split · {periodLabel}</Text>
+    <View className="mb-5 rounded-3xl bg-card p-5" style={SHADOWS.card}>
+      <View className="mb-4 flex-row items-baseline justify-between">
+        <Text className="text-base font-manrope-bold text-ink">Macro split</Text>
+        <Text className="text-xs font-manrope text-ink-muted">{periodLabel}</Text>
+      </View>
       <View className="flex-row items-center">
         <MacroDonut
           segments={segments}
           centerValue={String(Math.round(bucket.calories))}
-          centerLabel="kcal"
-          size={132}
+          centerLabel={`kcal · ${periodLabel.toLowerCase()}`}
+          size={148}
           strokeWidth={16}
         />
-        <View className="ml-5 flex-1">
+        <View className="ml-4 flex-1">
           {segments.map((segment) => (
-            <View key={segment.key} className="mb-2.5 flex-row items-center">
+            <View key={segment.key} className="mb-3 flex-row items-center">
               <View className="mr-2 h-2.5 w-2.5 rounded-full" style={{ backgroundColor: segment.color }} />
-              <Text className="font-manrope flex-1 text-sm text-ink-muted">{segment.label}</Text>
-              <Text className="font-manrope-semibold text-sm text-ink">
+              <Text className="flex-1 text-sm font-manrope text-ink-muted">{segment.label}</Text>
+              <Text className="text-sm font-manrope-semibold text-ink">
                 {Math.round(segment.value)}g
               </Text>
-              <Text className="font-manrope ml-2 w-9 text-right text-xs text-ink-faint">
+              <Text className="ml-2 w-10 text-right text-xs font-manrope text-ink-faint">
                 {percent(segment.value)}%
               </Text>
             </View>
           ))}
-          {totalGrams === 0 ? (
-            <Text className="font-manrope mt-1 text-xs text-ink-faint">
-              Nothing logged {periodLabel.toLowerCase()} yet.
-            </Text>
-          ) : null}
         </View>
       </View>
+      {totalGrams === 0 ? (
+        <Text className="mt-4 text-xs font-manrope text-ink-faint">
+          Nothing logged {periodLabel.toLowerCase()} yet — the split appears as you log meals.
+        </Text>
+      ) : null}
     </View>
   );
 }
 
-function StatTile({ label, value, unit, color }: { label: string; value: number; unit: string; color: string }) {
+interface TrendPage {
+  key: string;
+  title: string;
+  metric: BucketMetric;
+  unit: "kcal" | "g";
+  color: string;
+}
+
+const TREND_PAGES: TrendPage[] = [
+  { key: "calories", title: "Calories", metric: "calories", unit: "kcal", color: LINE_COLORS.calories },
+  { key: "protein", title: "Protein", metric: "protein", unit: "g", color: LINE_COLORS.protein },
+  { key: "carbs", title: "Carbs", metric: "carbs", unit: "g", color: LINE_COLORS.carbs },
+  { key: "fats", title: "Fats", metric: "fats", unit: "g", color: LINE_COLORS.fats },
+];
+
+/**
+ * One trend chart per page in a swipeable, snap-to-page carousel instead of
+ * three line charts stacked vertically. Dots show the active page.
+ */
+function TrendCarousel({ chartData }: { chartData: Bucket[] }) {
+  const { width: windowWidth } = useWindowDimensions();
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  // Pages span the full padded content width (screen − outer 16×2 padding);
+  // charts fit inside each page's card gutters (6×2) + card padding (16×2).
+  const pageWidth = windowWidth - 32;
+  const chartWidth = pageWidth - 12 - 32;
+  const latest = chartData[chartData.length - 1];
+
+  function handleMomentumEnd(event: NativeSyntheticEvent<NativeScrollEvent>) {
+    const index = Math.round(event.nativeEvent.contentOffset.x / pageWidth);
+    setActiveIndex(Math.max(0, Math.min(TREND_PAGES.length - 1, index)));
+  }
+
   return (
-    <View className="mx-1 flex-1 rounded-2xl bg-card p-3" style={SHADOWS.card}>
-      <Text className="font-manrope text-[11px] text-ink-muted">{label}</Text>
-      <View className="mt-1 flex-row items-baseline">
-        <Text className="font-manrope-extrabold text-lg" style={{ color }}>
-          {Math.round(value)}
-        </Text>
-        <Text className="font-manrope ml-1 text-[11px] text-ink-muted">{unit}</Text>
+    <View>
+      <ScrollView
+        horizontal
+        snapToInterval={pageWidth}
+        decelerationRate="fast"
+        showsHorizontalScrollIndicator={false}
+        onMomentumScrollEnd={handleMomentumEnd}
+        scrollEventThrottle={16}
+      >
+        {TREND_PAGES.map((page) => (
+          <View key={page.key} style={{ width: pageWidth }}>
+            <View className="mx-1.5 rounded-2xl bg-card p-4" style={SHADOWS.card}>
+              <View className="mb-3 flex-row items-center">
+                <View className="mr-2 h-2.5 w-2.5 rounded-full" style={{ backgroundColor: page.color }} />
+                <Text className="flex-1 text-base font-manrope-bold text-ink">{page.title}</Text>
+                <Text className="text-xs font-manrope text-ink-muted">
+                  {Math.round(latest[page.metric])} {page.unit}
+                </Text>
+              </View>
+              <LineChart
+                data={{
+                  labels: chartData.map((item) => item.label),
+                  datasets: [
+                    {
+                      data: chartData.map((item) => Math.round(item[page.metric])),
+                    },
+                  ],
+                }}
+                width={chartWidth}
+                height={190}
+                chartConfig={makeChartConfig(page.color)}
+                bezier
+                withInnerLines={false}
+                withOuterLines={false}
+                withShadow={false}
+                style={{ borderRadius: 16 }}
+              />
+            </View>
+          </View>
+        ))}
+      </ScrollView>
+      <View className="mt-3 flex-row items-center justify-center">
+        {TREND_PAGES.map((page, index) => (
+          <View
+            key={page.key}
+            className={`mr-1.5 h-1.5 rounded-full ${
+              index === activeIndex ? "w-5 bg-primary" : "w-1.5 bg-wash-deep"
+            }`}
+          />
+        ))}
       </View>
     </View>
   );
@@ -280,9 +321,6 @@ function AnalyticsContent() {
     );
   }
 
-  // Content width: screen − outer padding (16 × 2) − card padding (16 × 2).
-  const chartWidth = Dimensions.get("window").width - 64;
-
   return (
     <SafeAreaView className="flex-1 bg-surface" edges={["left", "right"]}>
       <AppHeader />
@@ -291,14 +329,14 @@ function AnalyticsContent() {
         contentContainerStyle={{ padding: 16, paddingBottom: bottomClearance }}
         showsVerticalScrollIndicator={false}
       >
-        <Text className="font-manrope-extrabold mb-1 text-2xl text-ink">Analytics</Text>
-        <Text className="font-manrope mb-4 text-sm text-ink-muted">
-          Calories, protein & fat trends across {viewMode === "week" ? "weeks" : "months"}
+        <Text className="mb-1 text-2xl font-manrope-extrabold text-ink">Analytics</Text>
+        <Text className="mb-4 text-sm font-manrope text-ink-muted">
+          Totals, macro split & trends — everything on one screen
         </Text>
 
         {!hasAnyData ? (
           <View className="rounded-2xl bg-card p-6" style={SHADOWS.card}>
-            <Text className="font-manrope text-center text-sm text-ink-muted">
+            <Text className="text-center text-sm font-manrope text-ink-muted">
               Not enough data yet. Log a few meals to see trends.
             </Text>
           </View>
@@ -341,45 +379,22 @@ function AnalyticsContent() {
               </Pressable>
             </View>
             {!hasMonthlyData ? (
-              <Text className="font-manrope mb-4 text-center text-xs text-ink-muted">
+              <Text className="mb-4 text-center text-xs font-manrope text-ink-muted">
                 Monthly view unlocks after at least 2 months of data.
               </Text>
             ) : null}
 
-            {/* Stat tiles — balanced 3-up row */}
-            <View className="mb-4 flex-row justify-between">
-              <StatTile label={`${periodLabel} · Calories`} value={current?.calories ?? 0} unit="kcal" color={COLORS.primary} />
-              <StatTile label={`${periodLabel} · Protein`} value={current?.protein ?? 0} unit="g" color={COLORS.secondary} />
-              <StatTile label={`${periodLabel} · Fat`} value={current?.fats ?? 0} unit="g" color={COLORS.tertiary} />
+            {/* Hero: macro split donut with kcal + macro stats in one card */}
+            <SplitHeroCard bucket={current} periodLabel={periodLabel} />
+
+            {/* Trend charts: one per swipe, dots instead of a stacked wall */}
+            <View className="mb-3 flex-row items-baseline justify-between">
+              <Text className="text-base font-manrope-bold text-ink">Trends</Text>
+              <Text className="text-xs font-manrope text-ink-muted">
+                {periodNoun} totals · swipe to compare
+              </Text>
             </View>
-
-            {/* Macro distribution donut */}
-            {current ? (
-              <MacroSplitCard bucket={current} periodLabel={periodLabel} />
-            ) : null}
-
-            {/* Trend charts */}
-            <MetricCard
-              title={`Calories · ${periodNoun} totals`}
-              color={LINE_COLORS.calories}
-              chartData={chartData}
-              width={chartWidth}
-              metric="calories"
-            />
-            <MetricCard
-              title={`Protein · ${periodNoun} totals`}
-              color={LINE_COLORS.protein}
-              chartData={chartData}
-              width={chartWidth}
-              metric="protein"
-            />
-            <MetricCard
-              title={`Fat · ${periodNoun} totals`}
-              color={LINE_COLORS.fats}
-              chartData={chartData}
-              width={chartWidth}
-              metric="fats"
-            />
+            <TrendCarousel chartData={chartData} />
           </>
         )}
       </ScrollView>
