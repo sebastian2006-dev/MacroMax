@@ -30,9 +30,9 @@ Built natively with React Native (Expo), TypeScript, and NativeWind — no accou
 | :---: | :---: | :---: |
 | <img src="./assets/SC1.jpeg" width="250" alt="Today's Overview" /> | <img src="./assets/SC2.jpeg" width="250" alt="Daily Log" /> | <img src="./assets/SC3.jpeg" width="250" alt="Custom Dish Builder" /> |
 
-| Food Search & Sliding Window | Analytics Dashboard | Profile & Settings |
-| :---: | :---: | :---: |
-| <img src="./assets/SC4.jpeg" width="250" alt="Food Search" /> | <img src="./assets/SC5.jpeg" width="250" alt="Analytics Dashboard" /> | <img src="./assets/SC6.jpeg" width="250" alt="Profile & Settings" /> |
+| Analytics Dashboard | Profile & Settings |
+| :---: | :---: |
+| <img src="./assets/SC5.jpeg" width="250" alt="Analytics Dashboard" /> | <img src="./assets/SC6.jpeg" width="250" alt="Profile & Settings" /> |
 
 ---
 
@@ -133,7 +133,7 @@ cd android && ./gradlew assembleRelease
 ```bash
 npm test           # run all unit tests
 npm run typecheck  # strict TypeScript check (app + tests)
-npm run ci         # typecheck + tests (what CI runs)
+npm run ci          # typecheck + tests (what CI runs)
 ```
 
 GitHub Actions (`.github/workflows/ci.yml`) runs both jobs on every push to `main`/`feature/*` and on PRs targeting `main`.

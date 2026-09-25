@@ -18,6 +18,8 @@ yarn-error.*
 android/
 ios/
 .idea/
+.reasonix/
+.env.example
 # Agent/workspace scratch (task logs, pasted attachments) — never part of the app.
 .reasonix/
 # Kept untracked on purpose: it currently carries real provider keys, so it must

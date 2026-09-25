@@ -9,6 +9,7 @@ import { MealSlot } from "@/components/MealSlot";
 import { useTabBarClearance } from "@/components/ScrollableTabBar";
 import { useAuth } from "@/src/hooks/useAuth";
 import { useDailyLog } from "@/src/hooks/useDailyLog";
+import { useWeekLoggedDates } from "@/src/hooks/useWeekLoggedDates";
 import {
   addDays,
   calculateTotals,
@@ -42,10 +43,13 @@ function LogContent() {
     return Array.from({ length: 7 }, (_, index) => addDays(monday, index));
   }, []);
 
+  const { loggedDates, refresh: refreshLoggedDates } = useWeekLoggedDates(userId, weekDates);
+
   useFocusEffect(
     useCallback(() => {
       void refreshLog();
-    }, [refreshLog])
+      void refreshLoggedDates();
+    }, [refreshLog, refreshLoggedDates])
   );
 
   const totals = useMemo(() => calculateTotals(items), [items]);
@@ -100,6 +104,7 @@ function LogContent() {
           selectedDate={selectedDate}
           onSelectDate={setSelectedDate}
           isToday={isToday}
+          loggedDates={loggedDates}
         />
 
         {/* Totals summary card */}

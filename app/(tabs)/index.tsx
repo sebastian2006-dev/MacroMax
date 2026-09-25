@@ -7,7 +7,6 @@ import { RequireAuth } from "@/components/RequireAuth";
 import { AppHeader } from "@/components/AppHeader";
 import { WeekStrip } from "@/components/WeekStrip";
 import { MacroRing } from "@/components/MacroRing";
-import { MacroProgressBar } from "@/components/MacroProgressBar";
 import { MacroCard } from "@/components/MacroCard";
 import { LowIntakeAlertCard } from "@/components/LowIntakeAlertCard";
 import { LimitAlertCard } from "@/components/LimitAlertCard";
@@ -15,6 +14,7 @@ import { useTabBarClearance } from "@/components/ScrollableTabBar";
 import { useAuth } from "@/src/hooks/useAuth";
 import { useProfile } from "@/src/hooks/useProfile";
 import { useDailyLog } from "@/src/hooks/useDailyLog";
+import { useWeekLoggedDates } from "@/src/hooks/useWeekLoggedDates";
 import {
   addDays,
   calculateTotals,
@@ -51,11 +51,14 @@ function DashboardContent() {
     return Array.from({ length: 7 }, (_, index) => addDays(monday, index));
   }, []);
 
+  const { loggedDates, refresh: refreshLoggedDates } = useWeekLoggedDates(userId, weekDates);
+
   useFocusEffect(
     useCallback(() => {
       void refreshLog();
       void refreshProfile();
-    }, [refreshLog, refreshProfile])
+      void refreshLoggedDates();
+    }, [refreshLog, refreshProfile, refreshLoggedDates])
   );
 
   const totals = useMemo(() => calculateTotals(items), [items]);
@@ -132,6 +135,7 @@ function DashboardContent() {
           selectedDate={selectedDate}
           onSelectDate={setSelectedDate}
           isToday={isToday}
+          loggedDates={loggedDates}
         />
 
         {/* Rings: Calories + Protein */}
@@ -165,27 +169,10 @@ function DashboardContent() {
           </View>
         ) : null}
 
-        {/* Macros progress: Carbs is a goal, Fats is an upper limit */}
-        <View className="mb-4 rounded-2xl bg-card p-4" style={SHADOWS.card}>
-          <Text className="mb-3 text-base font-manrope-bold text-ink">Today's Macros</Text>
-          <MacroProgressBar
-            label="Carbs"
-            current={totals.carbs}
-            target={targets.carbs}
-            color={MACRO_COLORS.carbs}
-          />
-          <MacroProgressBar
-            label="Fats"
-            current={totals.fats}
-            target={targets.fats}
-            color={MACRO_COLORS.fats}
-            limit
-          />
-        </View>
-
-        {/* Daily summary numbers */}
+        {/* Daily summary numbers — carries the fats-over-limit warning inline,
+            replacing the old separate "Today's Macros" progress-bar card. */}
         <View className="mb-4">
-          <MacroCard title="Daily Summary" macros={totals} />
+          <MacroCard title="Daily Summary" macros={totals} fatsTarget={targets.fats} />
         </View>
 
         {/* Breached limits first — these ask for action, the nudges below don't */}
@@ -215,9 +202,8 @@ function DashboardContent() {
               <Pressable
                 key={action.label}
                 onPress={action.onPress}
-                className={`flex-1 items-center justify-center rounded-2xl bg-primary-soft px-2 py-4 ${
-                  index < quickActions.length - 1 ? "mr-2" : ""
-                }`}
+                className={`flex-1 items-center justify-center rounded-2xl bg-primary-soft px-2 py-4 ${index < quickActions.length - 1 ? "mr-2" : ""
+                  }`}
               >
                 <Ionicons name={action.icon} size={24} color={COLORS.primary} />
                 <Text className="mt-1.5 text-center text-xs font-manrope-semibold text-ink">

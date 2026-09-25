@@ -8,31 +8,60 @@ export function useDailyLog(userId: string | null, date = new Date()) {
   const [log, setLog] = useState<DailyLog | null>(null);
   const [items, setItems] = useState<MealItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const hasLoadedRef = useRef(false);
+
+  // Tracks the most recently REQUESTED date. A refresh whose dateString no
+  // longer matches this ref by the time it resolves is stale — its response
+  // arrived for a date the user has since navigated away from — and must be
+  // dropped. Without this guard, rapidly tapping day chips (e.g. landing on
+  // "Today" right after tapping through a couple of days) lets an older,
+  // slower response resolve AFTER a newer one and overwrite it: the header/
+  // WeekStrip show "Today" selected while `items`/totals silently render an
+  // earlier day's data — the calendar-vs-graph "glitch".
+  const latestRequestedDate = useRef(dateString);
+  // Guards a fetch actually in flight, independent of React's render timing,
+  // so loading state is accurate on every date switch — not just the first.
+  const requestIdRef = useRef(0);
 
   const refresh = useCallback(async () => {
+    latestRequestedDate.current = dateString;
+    const requestId = ++requestIdRef.current;
+
     if (!userId) {
       setLog(null);
       setItems([]);
       return;
     }
 
-    if (!hasLoadedRef.current) {
-      setLoading(true);
-    }
+    setLoading(true);
 
     try {
       const dailyLog = await dbEnsureDailyLog(dateString);
+
+      // Stale check #1: a newer refresh has started since this one began.
+      if (requestId !== requestIdRef.current) {
+        return;
+      }
+
       if (!dailyLog) {
         return;
       }
 
       const mealItems = await getMealItems(dailyLog.id);
-      hasLoadedRef.current = true;
+
+      // Stale check #2: re-check after the second await too.
+      if (requestId !== requestIdRef.current) {
+        return;
+      }
+
       setLog(dailyLog);
       setItems(mealItems);
     } finally {
-      setLoading(false);
+      // Only the most recent request is allowed to clear the loading flag,
+      // so a slow stale response can't flip loading back off after a newer
+      // request already showed its own state.
+      if (requestId === requestIdRef.current) {
+        setLoading(false);
+      }
     }
   }, [userId, dateString]);
 

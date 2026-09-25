@@ -67,9 +67,9 @@ function normalizeCacheItem(item: Partial<FoodCacheItem>): FoodCacheItem {
   const rawSource: unknown = item.source;
   const source: FoodSource =
     rawSource === "open_food_facts" ||
-    rawSource === "fatsecret" ||
-    rawSource === "user_custom" ||
-    rawSource === "fallback"
+      rawSource === "fatsecret" ||
+      rawSource === "user_custom" ||
+      rawSource === "fallback"
       ? rawSource
       : "fallback"; // legacy "ifct2017" / "usda" rows land here
   return {
@@ -134,8 +134,8 @@ export async function upsertFoodCache(rows: Omit<FoodCacheItem, "id">[]): Promis
     const existingIndex = row.barcode
       ? cache.findIndex((item) => item.barcode === row.barcode)
       : row.external_id
-      ? cache.findIndex((item) => item.barcode === null && item.external_id === row.external_id)
-      : cache.findIndex(
+        ? cache.findIndex((item) => item.barcode === null && item.external_id === row.external_id)
+        : cache.findIndex(
           (item) =>
             item.barcode === null &&
             item.food_name.toLowerCase() === row.food_name.toLowerCase() &&
@@ -315,4 +315,29 @@ async function recalculateDailyLog(dailyLogId: string): Promise<void> {
     total_fats: dailyItems.reduce((sum, item) => sum + (item.fats || 0), 0),
   };
   await writeArray(DAILY_LOGS_KEY, logs);
+}
+/**
+ * Returns the set of log_date strings (within [startDate, endDate], inclusive)
+ * that have at least one non-empty meal item logged. Used by WeekStrip's
+ * logged-day dot indicator — a lightweight existence check, not the full
+ * item rows, so the week strip never has to load 7 days of meal items just
+ * to draw a dot.
+ */
+export async function getLoggedDatesInRange(
+  startDate: string,
+  endDate: string
+): Promise<string[]> {
+  const logs = await readArray<DailyLog>(DAILY_LOGS_KEY);
+  const items = await readArray<MealItem>(MEAL_ITEMS_KEY);
+
+  const loggedLogIds = new Set(items.map((item) => item.daily_log_id));
+
+  return logs
+    .filter(
+      (log) =>
+        log.log_date >= startDate &&
+        log.log_date <= endDate &&
+        loggedLogIds.has(log.id)
+    )
+    .map((log) => log.log_date);
 }

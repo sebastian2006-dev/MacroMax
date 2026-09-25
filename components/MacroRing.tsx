@@ -1,24 +1,24 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import Svg, { Circle, G } from "react-native-svg";
+import Animated, {
+  useAnimatedProps,
+  useSharedValue,
+  withTiming,
+  Easing,
+} from "react-native-reanimated";
 import { COLORS, MACRO_TRACKS } from "@/src/theme/colors";
 import { SHADOWS } from "@/src/theme/shadows";
 import { TILE_MAX_FONT_SCALE } from "@/src/theme/typography";
 
-/** Soft tint used for the empty ring track when the color prop isn't a macro color. */
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+
 const FALLBACK_TRACK = "#EEF1F7";
 
-/** Resolve a macro color to its matching *-soft track hex (Vitality palette). */
 function trackForColor(color: string): string {
-  if (color === COLORS.primary) {
-    return MACRO_TRACKS.calories;
-  }
-  if (color === COLORS.secondary) {
-    return MACRO_TRACKS.protein;
-  }
-  if (color === COLORS.tertiary) {
-    return MACRO_TRACKS.carbs;
-  }
+  if (color === COLORS.primary) return MACRO_TRACKS.calories;
+  if (color === COLORS.secondary) return MACRO_TRACKS.protein;
+  if (color === COLORS.tertiary) return MACRO_TRACKS.carbs;
   return FALLBACK_TRACK;
 }
 
@@ -26,28 +26,24 @@ interface MacroRingProps {
   label: string;
   value: number;
   unit: string;
-  /** Goal target; when 0/undefined the ring shows the plain count instead. */
   target?: number | null;
   color: string;
-  /**
-   * Design size of the ring in dp. It is used as the *maximum* diameter: the
-   * ring shrinks to fit narrower cards instead of overflowing them (see below).
-   */
   size?: number;
   strokeWidth?: number;
 }
 
 /**
  * Circular progress ring (donut) for a daily macro total.
- * When no goal target is configured, the ring renders as a neutral full ring
- * with the actual count in the middle — no empty progress, no error clutter.
  *
- * Two cards sit side by side, so a card is only ~(screen − 64dp) / 2 wide: at
- * `size = 132` a fixed-width <Svg> is wider than the card's content box on
- * narrow phones and bleeds over the card edge / centre gutter. The SVG is
- * therefore laid out at `width: 100%` of the card's content box (capped at
- * `size`) with a square `viewBox`, which keeps the drawn geometry pixel-identical
- * at full size and scales it down cleanly when the card is narrower.
+ * The fill animates with react-native-reanimated (UI-thread worklets), NOT
+ * the legacy Animated API. Reanimated's useAnimatedProps writes directly to
+ * the shadow tree on Fabric every frame, so it works correctly on the new
+ * architecture — unlike `Animated.Value` + `setNativeProps`, which silently
+ * no-ops on Fabric and causes the ring to jump instantly instead of animate.
+ *
+ * The animation is driven by a shared value that re-runs withTiming whenever
+ * `progress` (derived from value/target) changes — including on date switch,
+ * so switching days animates a NEW fill rather than jump-cutting.
  */
 export const MacroRing = React.memo(function MacroRing({
   label,
@@ -61,18 +57,23 @@ export const MacroRing = React.memo(function MacroRing({
   const hasTarget = typeof target === "number" && target > 0;
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
-  const progress = hasTarget ? Math.min(1, Math.max(0, value / target)) : 0;
+  const progress = hasTarget ? Math.min(1, Math.max(0, value / (target as number))) : 0;
   const trackColor = trackForColor(color);
 
-  // The arc is rendered DIRECTLY from props, with no Animated layer. The
-  // previous build animated it with the legacy RN Animated API
-  // (`useNativeDriver: false`), which drives react-native-svg nodes through
-  // setNativeProps — a no-op on the new architecture (Fabric) on Android 12.
-  // The `setValue(0)` reset therefore applied instantly while the 900ms fill
-  // never painted, so every day switch visibly snapped the rings to empty —
-  // the "graphs glitch out" bug captured in the user's screen recording.
-  // Instant, prop-driven updates are glitch-free by construction.
-  const strokeDashoffset = circumference * (1 - progress);
+  const animatedProgress = useSharedValue(0);
+
+  useEffect(() => {
+    animatedProgress.value = withTiming(progress, {
+      duration: 700,
+      easing: Easing.out(Easing.cubic),
+    });
+    // progress is a derived primitive (number), safe as an effect dep —
+    // this re-fires on every value/target change, including date switches.
+  }, [progress, animatedProgress]);
+
+  const animatedProps = useAnimatedProps(() => ({
+    strokeDashoffset: circumference * (1 - animatedProgress.value),
+  }));
 
   return (
     <View className="flex-1 items-center rounded-2xl bg-card p-4" style={SHADOWS.card}>
@@ -88,7 +89,7 @@ export const MacroRing = React.memo(function MacroRing({
           />
           {hasTarget ? (
             <G rotation={-90} origin={`${size / 2}, ${size / 2}`}>
-              <Circle
+              <AnimatedCircle
                 cx={size / 2}
                 cy={size / 2}
                 r={radius}
@@ -97,7 +98,7 @@ export const MacroRing = React.memo(function MacroRing({
                 fill="none"
                 strokeLinecap="round"
                 strokeDasharray={circumference}
-                strokeDashoffset={strokeDashoffset}
+                animatedProps={animatedProps}
               />
             </G>
           ) : null}
@@ -120,8 +121,6 @@ export const MacroRing = React.memo(function MacroRing({
         </View>
       </View>
 
-      {/* Caption: one line for the macro name (never "Protei…"), up to two
-          centred lines for the detail so it wraps instead of ellipsizing. */}
       <Text
         numberOfLines={1}
         maxFontSizeMultiplier={TILE_MAX_FONT_SCALE}
