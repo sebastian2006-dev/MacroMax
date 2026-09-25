@@ -28,11 +28,15 @@ Built natively with React Native (Expo), TypeScript, and NativeWind — no accou
 
 | Today's Overview | Daily Log | Custom Dish Builder |
 | :---: | :---: | :---: |
-| <img src="./assets/SC1.jpeg" width="250" alt="Today's Overview" /> | <img src="./assets/SC2.jpeg" width="250" alt="Daily Log" /> | <img src="./assets/SC3.jpeg" width="250" alt="Custom Dish Builder" /> |
+| <img src="./assets/SC1.jpeg" width="250" alt="Today's Overview" /> | <img src="./assets/SC5.jpeg" width="250" alt="Daily Log" /> | <img src="./assets/SC3.jpeg" width="250" alt="Custom Dish Builder" /> |
 
-| Analytics Dashboard | Profile & Settings |
-| :---: | :---: |
-| <img src="./assets/SC5.jpeg" width="250" alt="Analytics Dashboard" /> | <img src="./assets/SC6.jpeg" width="250" alt="Profile & Settings" /> |
+<div align="center">
+
+<img src="./assets/SC2.jpeg" width="250" alt="Analytics Dashboard" />&nbsp;&nbsp;&nbsp;<img src="./assets/SC6.jpeg" width="250" alt="Profile & Settings" />
+
+**Analytics Dashboard** &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; **Profile & Settings**
+
+</div>
 
 ---
 
