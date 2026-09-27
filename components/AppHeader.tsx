@@ -9,22 +9,17 @@ import Svg, {
 } from "react-native-svg";
 import { useSyncStatus } from "@/src/hooks/useSyncStatus";
 import { SyncMode } from "@/src/lib/syncStatus";
-import { COLORS } from "@/src/theme/colors";
+import { BRAND, COLORS } from "@/src/theme/colors";
 import { SHADOWS } from "@/src/theme/shadows";
 
 const MODE_COLORS: Record<SyncMode, string> = {
   idle: COLORS.inkFaint,
-  local: COLORS.primary,
+  local: COLORS.primaryInk,
   cached: COLORS.inkMuted,
   online: COLORS.secondary,
   mixed: COLORS.tertiary,
   offline: COLORS.danger,
 };
-
-/** Brand-gradient stop colors matching the M icon (top → bottom = left → right). */
-const BRAND_BLUE = "#1E60E6";
-const BRAND_GREEN = "#12963E";
-const BRAND_ORANGE = "#EB7D0A";
 
 interface AppHeaderProps {
   /** "dark" for use over the camera scanner; otherwise light. */
@@ -35,9 +30,11 @@ interface AppHeaderProps {
  * Pinned top app header: "MacroMax" branding plus a live data-source status
  * pill (FatSecret / Open Food Facts online lookups vs local/cached data).
  *
- * The wordmark uses an SVG `<LinearGradient>` (Blue → Green → Orange) to match
- * the app icon's three color bands. On dark backgrounds (camera scanner) the
- * text falls back to solid white for legibility.
+ * The wordmark uses an SVG `<LinearGradient>` across the logo's three arcs.
+ * Because the gradient IS the text here, it uses the DEEP sibling stops
+ * (emerald → blue → amber, 5:1 or better on the light header) rather than the
+ * bright arc colors, which measure under 2.6:1 on a light surface. On
+ * dark/overlay variants (camera scanner) the name falls back to solid white.
  */
 export function AppHeader({ variant = "light" }: AppHeaderProps) {
   const insets = useSafeAreaInsets();
@@ -70,9 +67,9 @@ export function AppHeader({ variant = "light" }: AppHeaderProps) {
             <Svg height={30} width={155}>
               <Defs>
                 <SvgLinearGradient id="brandGrad" x1="0" y1="0" x2="1" y2="0">
-                  <Stop offset="0" stopColor={BRAND_BLUE} />
-                  <Stop offset="0.5" stopColor={BRAND_GREEN} />
-                  <Stop offset="1" stopColor={BRAND_ORANGE} />
+                  <Stop offset="0" stopColor={BRAND.wordmark[0]} />
+                  <Stop offset="0.5" stopColor={BRAND.wordmark[1]} />
+                  <Stop offset="1" stopColor={BRAND.wordmark[2]} />
                 </SvgLinearGradient>
               </Defs>
               <SvgText

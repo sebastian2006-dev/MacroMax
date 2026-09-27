@@ -1,5 +1,5 @@
 import React, { memo, useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { RequireAuth } from "@/components/RequireAuth";
 import { AppHeader } from "@/components/AppHeader";
@@ -8,8 +8,12 @@ import { UNIT_GRAM_DEFAULTS } from "@/src/lib/servingUnits";
 import { isFatSecretConfigured } from "@/src/lib/fatSecret";
 import { useAuth } from "@/src/hooks/useAuth";
 import { useProfile } from "@/src/hooks/useProfile";
+import { exportBackup, pickBackupFile } from "@/src/lib/backup";
+import { BackupError, summarizeBackup } from "@/src/lib/backupData";
+import { readAllUserData, restoreAllData } from "@/src/lib/db";
 import { COLORS } from "@/src/theme/colors";
 import { SHADOWS } from "@/src/theme/shadows";
+import * as Updates from "expo-updates";
 
 interface GoalFieldProps {
   label: string;
@@ -37,9 +41,139 @@ const GoalField = memo(function GoalField({ label, value, onChange }: GoalFieldP
   );
 });
 
+/**
+ * Data Management card: full local backup → share sheet (Task 4 export),
+ * restore from a picked backup file (Task 4 import). Import is destructive
+ * and confirmed with the file's own summary before anything is touched; the
+ * app then offers a reload so every screen re-reads the restored database.
+ */
+function DataManagementCard() {
+  const [busy, setBusy] = useState<"export" | "import" | null>(null);
+
+  async function handleExport() {
+    setBusy("export");
+    try {
+      const payload = await readAllUserData();
+      await exportBackup(payload);
+    } catch (error) {
+      Alert.alert(
+        "Export failed",
+        error instanceof BackupError
+          ? error.message
+          : "Something went wrong while writing your backup."
+      );
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handleImport() {
+    setBusy("import");
+    try {
+      const picked = await pickBackupFile();
+      if (!picked) return; // user cancelled the picker
+
+      const summary = summarizeBackup(picked.payload);
+      const exportedAt = picked.payload.exported_at;
+      const exportedLabel =
+        exportedAt && exportedAt !== new Date(0).toISOString()
+          ? new Date(exportedAt).toLocaleString()
+          : "unknown date";
+
+      const confirmed = await new Promise<boolean>((resolve) => {
+        Alert.alert(
+          "Restore backup?",
+          `"${picked.filename}" (${exportedLabel}) contains ${summary}.\n\n` +
+            `Restoring REPLACES everything currently on this device — ` +
+            `logs, recipes, goals and settings.`,
+          [
+            { text: "Cancel", style: "cancel", onPress: () => resolve(false) },
+            { text: "Restore", style: "destructive", onPress: () => resolve(true) },
+          ]
+        );
+      });
+      if (!confirmed) return;
+
+      await restoreAllData(picked.payload);
+
+      Alert.alert(
+        "Backup restored",
+        "Your data has been replaced with the backup. Reload the app now?",
+        [
+          {
+            text: "Later",
+            style: "cancel",
+          },
+          {
+            text: "Reload",
+            onPress: () => {
+              // expo-updates' reload restarts the JS runtime, which reopens
+              // the restored database from scratch in every screen/hook.
+              void Updates.reloadAsync().catch(() => {
+                // A refused reload is cosmetic — data is already restored.
+              });
+            },
+          },
+        ]
+      );
+    } catch (error) {
+      Alert.alert(
+        "Import failed",
+        error instanceof BackupError
+          ? error.message
+          : "That file could not be restored."
+      );
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <View className="mb-4 rounded-2xl bg-card p-4" style={SHADOWS.card}>
+      <Text className="font-manrope-bold mb-2 text-base text-ink">Data management</Text>
+      <Text className="font-manrope mb-4 text-sm text-ink-muted">
+        Everything lives on this device. Save a backup to your files or cloud,
+        and restore it here — for example after switching phones or reinstalling.
+      </Text>
+
+      <Pressable
+        onPress={() => void handleExport()}
+        disabled={busy !== null}
+        className="mb-2 rounded-3xl bg-primary py-3.5 disabled:opacity-60"
+        accessibilityRole="button"
+      >
+        {busy === "export" ? (
+          <ActivityIndicator color={COLORS.ink} />
+        ) : (
+          <Text className="font-manrope-bold text-center text-ink">Export backup</Text>
+        )}
+      </Pressable>
+
+      <Pressable
+        onPress={() => void handleImport()}
+        disabled={busy !== null}
+        className="rounded-3xl border border-edge bg-card py-3.5 disabled:opacity-60"
+        accessibilityRole="button"
+      >
+        {busy === "import" ? (
+          <ActivityIndicator color={COLORS.ink} />
+        ) : (
+          <Text className="font-manrope-bold text-center text-ink">Import backup</Text>
+        )}
+      </Pressable>
+
+      <Text className="font-manrope mt-3 text-xs leading-4 text-ink-faint">
+        A backup includes your logs, meals, recipes, goals, name and settings —
+        as a JSON file you can keep anywhere. Importing one replaces what is on
+        this device.
+      </Text>
+    </View>
+  );
+}
+
 function SettingsContent() {
   const { userId, name, setName } = useAuth();
-  const { profile, loading, updateTargets } = useProfile(userId);
+  const { profile, updateTargets } = useProfile(userId);
   const bottomClearance = useTabBarClearance();
   const fatSecretConnected = isFatSecretConfigured();
   const [displayName, setDisplayName] = useState(name ?? "");
@@ -99,13 +233,8 @@ function SettingsContent() {
     }
   }
 
-  if (loading) {
-    return (
-      <View className="flex-1 items-center justify-center bg-surface">
-        <ActivityIndicator size="large" color={COLORS.primary} />
-      </View>
-    );
-  }
+  // No full-screen spinner: the profile is a local SQLite read that lands in
+  // milliseconds — render instantly, fill in as data arrives.
 
   return (
     <SafeAreaView className="flex-1 bg-surface" edges={["left", "right"]}>
@@ -136,9 +265,9 @@ function SettingsContent() {
             accessibilityRole="button"
           >
             {nameSaving ? (
-              <ActivityIndicator color={COLORS.card} />
+              <ActivityIndicator color={COLORS.ink} />
             ) : (
-              <Text className="font-manrope-bold text-center text-card">Save Name</Text>
+              <Text className="font-manrope-bold text-center text-ink">Save Name</Text>
             )}
           </Pressable>
         </View>
@@ -167,7 +296,7 @@ function SettingsContent() {
           <GoalField label="Fats (g) — daily limit" value={fats} onChange={onFatsChange} />
 
           {saved ? (
-            <Text className="font-manrope mb-3 text-sm text-primary">
+            <Text className="font-manrope mb-3 text-sm text-primary-ink">
               Saved successfully.
             </Text>
           ) : null}
@@ -179,14 +308,17 @@ function SettingsContent() {
             accessibilityRole="button"
           >
             {saving ? (
-              <ActivityIndicator color={COLORS.card} />
+              <ActivityIndicator color={COLORS.ink} />
             ) : (
-              <Text className="font-manrope-bold text-center text-card">
+              <Text className="font-manrope-bold text-center text-ink">
                 Save Targets
               </Text>
             )}
           </Pressable>
         </View>
+
+        {/* Data management: local backup export / import (Task 4) */}
+        <DataManagementCard />
 
         {/* Serving unit conversions */}
         <View className="mb-4 rounded-2xl bg-card p-4" style={SHADOWS.card}>
@@ -245,7 +377,7 @@ function SettingsContent() {
                 FatSecret
               </Text>
               {fatSecretConnected ? (
-                <Text className="font-manrope-semibold text-sm text-primary">
+                <Text className="font-manrope-semibold text-sm text-primary-ink">
                   Connected
                 </Text>
               ) : null}

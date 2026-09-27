@@ -4,9 +4,15 @@
     "slug": "macromax",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/macromax_A_ring_1024.png",
     "scheme": "macromax",
     "userInterfaceStyle": "light",
+    "backgroundColor": "#F4F9F6",
+    "splash": {
+      "image": "./assets/macromax_A_ring_1024.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#F4F9F6"
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.macromax.app"
@@ -14,8 +20,8 @@
     "android": {
       "package": "com.macromax.app",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#FFFFFF"
+        "foregroundImage": "./assets/macromax_A_ring_1024.png",
+        "backgroundColor": "#0B4335"
       },
       "permissions": [
         "CAMERA",
@@ -34,7 +40,9 @@
           "cameraPermission": "Allow MacroMax to scan food barcodes."
         }
       ],
-      "expo-font"
+      "expo-font",
+      "expo-sqlite",
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true

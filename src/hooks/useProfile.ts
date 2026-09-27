@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { getProfile, updateProfileTargets } from "@/src/lib/db";
 import { Profile } from "@/src/types";
 

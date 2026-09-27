@@ -1,5 +1,11 @@
-﻿import { useCallback, useEffect, useRef, useState } from "react";
-import { addMealItem as dbAddMealItem, ensureDailyLog as dbEnsureDailyLog, getMealItems, removeMealItem as dbRemoveMealItem } from "@/src/lib/db";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  addMealItem as dbAddMealItem,
+  ensureDailyLog as dbEnsureDailyLog,
+  getMealItems,
+  isDayLocked,
+  removeMealItem as dbRemoveMealItem,
+} from "@/src/lib/db";
 import { DailyLog, MealItem, MealType } from "@/src/types";
 import { toLocalDateString } from "@/src/lib/nutrition";
 
@@ -7,6 +13,11 @@ export function useDailyLog(userId: string | null, date = new Date()) {
   const dateString = toLocalDateString(date);
   const [log, setLog] = useState<DailyLog | null>(null);
   const [items, setItems] = useState<MealItem[]>([]);
+  /**
+   * Whether this date's log is locked ("Lock & Complete Day"). null = not yet
+   * known (bootstrapped from the same refresh that loads the items).
+   */
+  const [locked, setLocked] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(false);
 
   // Tracks the most recently REQUESTED date. A refresh whose dateString no
@@ -29,6 +40,7 @@ export function useDailyLog(userId: string | null, date = new Date()) {
     if (!userId) {
       setLog(null);
       setItems([]);
+      setLocked(null);
       return;
     }
 
@@ -51,6 +63,21 @@ export function useDailyLog(userId: string | null, date = new Date()) {
       // Stale check #2: re-check after the second await too.
       if (requestId !== requestIdRef.current) {
         return;
+      }
+
+      // Lock state rides along with the same refresh — no extra query path,
+      // no extra loading states. (A failure here must never blank the log,
+      // so it degrades to "unlocked".)
+      try {
+        const lockTimestamp = await isDayLocked(dateString);
+        if (requestId !== requestIdRef.current) {
+          return;
+        }
+        setLocked(lockTimestamp !== null);
+      } catch {
+        if (requestId === requestIdRef.current) {
+          setLocked(false);
+        }
       }
 
       setLog(dailyLog);
@@ -79,6 +106,10 @@ export function useDailyLog(userId: string | null, date = new Date()) {
       carbs: number;
       fats: number;
     }) => {
+      if (locked) {
+        return false; // Locked days refuse writes (also enforced in the data layer).
+      }
+
       let dailyLog = log;
       if (!dailyLog && userId) {
         dailyLog = await dbEnsureDailyLog(dateString);
@@ -96,7 +127,7 @@ export function useDailyLog(userId: string | null, date = new Date()) {
       await refresh();
       return true;
     },
-    [log, userId, dateString, refresh]
+    [log, locked, userId, dateString, refresh]
   );
 
   const removeMealItem = useCallback(
@@ -112,5 +143,5 @@ export function useDailyLog(userId: string | null, date = new Date()) {
     [refresh]
   );
 
-  return { log, items, loading, refresh, addMealItem, removeMealItem };
+  return { log, items, locked, loading, refresh, addMealItem, removeMealItem };
 }

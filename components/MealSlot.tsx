@@ -84,7 +84,7 @@ function MealSlotComponent({ mealType, items, onAdd, onRemove }: MealSlotProps) 
         onPress={() => onAdd(mealType)}
         className="mt-2 rounded-xl border border-dashed border-primary/40 py-2.5"
       >
-        <Text className="text-center text-sm font-manrope-semibold text-primary">
+        <Text className="text-center text-sm font-manrope-semibold text-primary-ink">
           + Add {mealType}
         </Text>
       </Pressable>

@@ -14,6 +14,7 @@ import { useFocusEffect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AppHeader } from "@/components/AppHeader";
 import { IngredientResultsSheet } from "@/components/IngredientResultsSheet";
+import { MealTargetSheet } from "@/components/MealTargetSheet";
 import { RequireAuth } from "@/components/RequireAuth";
 import { SearchBar } from "@/components/SearchBar";
 import { defaultServingFor, ServingInput } from "@/components/ServingInput";
@@ -21,8 +22,8 @@ import { useTabBarClearance } from "@/components/ScrollableTabBar";
 import { useAuth } from "@/src/hooks/useAuth";
 import { useDailyLog } from "@/src/hooks/useDailyLog";
 import { useFoodSearch } from "@/src/hooks/useFoodSearch";
-import { getCustomRecipes, insertCustomRecipe } from "@/src/lib/db";
-import { addMacros, EMPTY_MACROS, scaleMacros } from "@/src/lib/nutrition";
+import { getCustomRecipes, insertCustomRecipe, isDayLocked, unlockDay } from "@/src/lib/db";
+import { addMacros, EMPTY_MACROS, scaleMacros, toLocalDateString } from "@/src/lib/nutrition";
 import {
   DEFAULT_SERVING_STATE,
   formatServingSize,
@@ -32,7 +33,7 @@ import {
   ServingState,
   ServingUnit,
 } from "@/src/lib/servingUnits";
-import { CustomRecipe, RecipeIngredient, SearchResult, ServingPortion } from "@/src/types";
+import { CustomRecipe, MealType, RecipeIngredient, SearchResult, ServingPortion } from "@/src/types";
 import { COLORS } from "@/src/theme/colors";
 import { SHADOWS } from "@/src/theme/shadows";
 
@@ -84,6 +85,10 @@ function RecipeContent() {
   // Brief ✓ feedback on the saved-dish card whose "+" was just tapped.
   const [addedRecipeId, setAddedRecipeId] = useState<string | null>(null);
   const addedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // The dish whose "+" was tapped — opens the meal-target bottom sheet.
+  const [targetDish, setTargetDish] = useState<CustomRecipe | null>(null);
+  // null = unknown (not yet loaded); otherwise whether today is locked.
+  const [locked, setLocked] = useState<boolean | null>(null);
 
   useEffect(() => {
     setResultsDismissed(false);
@@ -116,6 +121,8 @@ function RecipeContent() {
   const loadRecipes = useCallback(async () => {
     const recipes = await getCustomRecipes();
     setSavedRecipes(recipes);
+    const lockTimestamp = await isDayLocked(toLocalDateString(new Date()));
+    setLocked(lockTimestamp !== null);
   }, []);
 
   useFocusEffect(
@@ -206,10 +213,24 @@ function RecipeContent() {
     }
   }
 
-  /** Logs the whole saved batch to today and flashes a ✓ on the card. */
-  async function handleAddToday(recipe: CustomRecipe) {
+  /** Opens the "where to log it?" sheet for a saved dish. */
+  function requestMealTarget(recipe: CustomRecipe) {
+    if (locked) {
+      return; // Day is locked — writes are refused (data layer guards too).
+    }
+    setTargetDish(recipe);
+  }
+
+  /** Logs the whole saved batch to the chosen meal and flashes a ✓ on the card. */
+  async function handleConfirmTarget(mealType: MealType): Promise<boolean> {
+    const recipe = targetDish;
+    if (!recipe || locked) {
+      setTargetDish(null);
+      return false;
+    }
+
     const added = await addMealItem({
-      meal_type: "Snacks/Extra",
+      meal_type: mealType,
       item_name: recipe.recipe_name,
       serving_size: "1 recipe",
       calories: Math.round(recipe.total_calories),
@@ -218,15 +239,20 @@ function RecipeContent() {
       fats: Math.round(recipe.total_fats),
     });
     if (!added) {
-      return;
+      setTargetDish(null);
+      return false;
     }
 
+    setTargetDish(null);
     setAddedRecipeId(recipe.id);
     if (addedTimer.current) {
       clearTimeout(addedTimer.current);
     }
     addedTimer.current = setTimeout(() => setAddedRecipeId(null), 1400);
+    return true;
   }
+
+  const handleDismissTarget = useCallback(() => setTargetDish(null), []);
 
   return (
     <SafeAreaView className="flex-1 bg-surface" edges={["left", "right"]}>
@@ -270,7 +296,7 @@ function RecipeContent() {
                   onPress={addIngredient}
                   className="mt-3 rounded-3xl bg-primary py-2.5"
                 >
-                  <Text className="text-center font-manrope-bold text-card">
+                  <Text className="text-center font-manrope-bold text-ink">
                     Add Ingredient
                   </Text>
                 </Pressable>
@@ -331,20 +357,41 @@ function RecipeContent() {
               className="flex-row items-center justify-between rounded-3xl bg-primary px-5 py-3.5 disabled:opacity-50"
             >
               {saving ? (
-                <ActivityIndicator color={COLORS.card} />
+                <ActivityIndicator color={COLORS.ink} />
               ) : (
-                <Text className="font-manrope-bold text-card">Save Dish</Text>
+                <Text className="font-manrope-bold text-ink">Save Dish</Text>
               )}
               {!saving && ingredients.length > 0 ? (
-                <Text className="ml-3 shrink text-xs font-manrope-semibold text-primary-soft">
+                <Text className="ml-3 shrink text-xs font-manrope-semibold text-ink/70">
                   {macroSummary(totals.calories, totals.protein, totals.carbs, totals.fats)}
                 </Text>
               ) : null}
             </Pressable>
           </View>
 
-          {/* Saved dishes — compact cards, one-tap "+" to log today */}
-          <Text className="mb-2 text-lg font-manrope-bold text-ink">Saved Dishes</Text>
+          {/* Saved dishes — compact cards, "+" opens the meal-target sheet */}
+          <View className="mb-2 flex-row items-center justify-between">
+            <Text className="text-lg font-manrope-bold text-ink">Saved Dishes</Text>
+            {locked ? (
+              <Pressable
+                onPress={() =>
+                  void unlockDay(toLocalDateString(new Date())).then(() => setLocked(false))
+                }
+                className="flex-row items-center rounded-full bg-wash px-3 py-1.5"
+                accessibilityLabel="Unlock today for editing"
+              >
+                <Ionicons name="open-outline" size={13} color={COLORS.inkMuted} />
+                <Text className="font-manrope-semibold ml-1 text-xs text-ink-muted">
+                  Unlock day
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
+          {locked ? (
+            <Text className="font-manrope mb-2 text-xs text-ink-faint">
+              Today is locked — unlock to log dishes.
+            </Text>
+          ) : null}
           {savedRecipes.length === 0 ? (
             <Text className="font-manrope text-ink-faint">
               No custom dishes yet. Build your first above.
@@ -373,18 +420,19 @@ function RecipeContent() {
                     </Text>
                   </View>
                   <Pressable
-                    onPress={() => void handleAddToday(recipe)}
+                    onPress={() => requestMealTarget(recipe)}
+                    disabled={locked === true}
                     hitSlop={8}
                     accessibilityRole="button"
-                    accessibilityLabel={`Add ${recipe.recipe_name} to today's log`}
-                    className={`h-10 w-10 items-center justify-center rounded-full ${
+                    accessibilityLabel={`Choose a meal for ${recipe.recipe_name}`}
+                    className={`h-10 w-10 items-center justify-center rounded-full disabled:opacity-40 ${
                       justAdded ? "bg-primary" : "bg-primary-soft"
                     }`}
                   >
                     <Ionicons
                       name={justAdded ? "checkmark" : "add"}
                       size={20}
-                      color={justAdded ? COLORS.card : COLORS.primary}
+                      color={justAdded ? COLORS.ink : COLORS.primaryInk}
                     />
                   </Pressable>
                 </View>
@@ -400,6 +448,13 @@ function RecipeContent() {
           results={ingredientResults}
           onSelect={handleSelectResult}
           onClose={handleCloseResults}
+        />
+
+        {/* "Where should this go?" sheet for the Saved Dishes "+" button */}
+        <MealTargetSheet
+          dishName={targetDish?.recipe_name ?? null}
+          onPick={handleConfirmTarget}
+          onDismiss={handleDismissTarget}
         />
       </KeyboardAvoidingView>
     </SafeAreaView>

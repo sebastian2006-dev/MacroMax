@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { getLoggedDatesInRange } from "@/src/lib/db";
 import { toLocalDateString } from "@/src/lib/nutrition";
 

@@ -1,27 +1,50 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import {
+  getAppPref,
+  getProfile,
+  resetDbConnection,
+  saveProfileName,
+  setAppPref,
+  setOnboardingComplete,
+  USER_PREF_KEYS,
+} from "@/src/lib/db";
 
 /**
  * The one place the "who is using this device" answer lives.
  *
- * Before this existed every `useAuth()` call kept its own copy of the state and
- * only refreshed it from a `useFocusEffect`, so each screen instance could be
- * stuck at `initializing: true` until it happened to gain focus — and saving a
- * name on one screen left the others stale. A module-level store fixes both:
- * the value is read once per app launch, every hook instance subscribes to the
- * same snapshot, and `initializing` is guaranteed to settle (success *or*
- * failure) so a gate can never spin forever.
+ * Identity (display name + onboarding flag) is persisted in SQLite NEXT TO the
+ * food logs — the name in the `profile` row, flags in `user_prefs` — so it
+ * survives app updates exactly like logged data does. AsyncStorage is gone
+ * from the app entirely.
+ *
+ * Hydration contract (this is the fix for "the app asks for my name after every
+ * update"): the auth gate NEVER opens on a guessed state. The old store raced
+ * storage against a 3-second timeout and opened the gate with
+ * `hasCompletedOnboarding: false` when storage was slow — sending a returning
+ * user to the name screen on a cold start, with no way to recover from the
+ * wrong route. Now `initializing` stays true until the SQLite read settles
+ * (success or failure), RequireAuth holds the branded splash meanwhile, and
+ * the settled value is the value the gate acts on.
+ *
+ * The first frame still never depends on storage: the root layout renders the
+ * router immediately, and every gated screen shows the same quiet branded
+ * placeholder while `initializing` is true. SQLite answers in milliseconds on
+ * device.
+ *
+ * If the SQLite open itself FAILS, we fail OPEN to the first-run experience
+ * rather than spinning forever — and a user who completes onboarding in that
+ * state simply re-seeds the fresh DB.
  */
-
-const NAME_KEY = "@macromax/name";
 
 export interface AuthState {
   /** Saved display name, or null when the user has not set one yet. */
   name: string | null;
-  /** True until the first storage read settles. */
+  /** True once the user has completed the full onboarding flow. */
+  hasCompletedOnboarding: boolean;
+  /** True until the first SQLite read settles. */
   initializing: boolean;
 }
 
-let state: AuthState = { name: null, initializing: true };
+let state: AuthState = { name: null, hasCompletedOnboarding: false, initializing: true };
 const listeners = new Set<() => void>();
 
 function setState(patch: Partial<AuthState>): void {
@@ -43,45 +66,19 @@ export function subscribeToAuth(listener: () => void): () => void {
   };
 }
 
-/**
- * Upper bound on the very first storage read. AsyncStorage answers in
- * milliseconds, but the first paint must not depend on it answering at all: if
- * it is slower than this, the app opens on the (empty) first-run experience and
- * adopts a late value whenever it finally arrives.
- */
-const LOAD_TIMEOUT_MS = 3000;
-
-async function readStoredName(): Promise<void> {
-  const read = AsyncStorage.getItem(NAME_KEY);
-
+async function readIdentity(): Promise<void> {
   try {
-    const stored = await Promise.race([
-      read,
-      new Promise<undefined>((resolve) => {
-        setTimeout(() => resolve(undefined), LOAD_TIMEOUT_MS);
-      }),
-    ]);
-
-    setState({ name: stored?.trim() || null, initializing: false });
-
-    if (stored === undefined) {
-      // Storage answered after the timeout — adopt it, but leave the gate open.
-      void read
-        .then((late) => {
-          const lateName = late?.trim() || null;
-          if (lateName !== state.name) {
-            setState({ name: lateName });
-          }
-        })
-        .catch(() => {
-          // The rejection is already reported by the catch block below.
-        });
-    }
+    const [profile, flag] = await Promise.all([getProfile(), getAppPref(USER_PREF_KEYS.onboarding)]);
+    const name = profile?.username?.trim() || null;
+    setState({
+      name,
+      hasCompletedOnboarding: flag === "true" && name !== null,
+      initializing: false,
+    });
   } catch (error) {
-    // A storage failure must never leave the app gated behind a spinner: the
-    // user gets the (empty) first-run experience instead.
-    console.warn(`Failed to read ${NAME_KEY}; starting with an empty profile.`, error);
-    setState({ name: null, initializing: false });
+    // Fail OPEN: never gate the app behind an unreadable database.
+    console.warn("Failed to read identity from SQLite; starting the first-run experience.", error);
+    setState({ name: null, hasCompletedOnboarding: false, initializing: false });
   }
 }
 
@@ -89,24 +86,60 @@ let loadPromise: Promise<void> | null = null;
 
 /**
  * Starts the initial read exactly once per app launch. Safe to call from every
- * screen (and from module scope of the hook) — later callers share the promise.
+ * screen — later callers share the promise.
  */
 export function ensureAuthLoaded(): Promise<void> {
   if (!loadPromise) {
-    loadPromise = readStoredName();
+    loadPromise = readIdentity();
   }
   return loadPromise;
 }
 
-/** Persists the display name and publishes it to every subscriber. */
+/**
+ * Persists the display name and publishes it to every subscriber. Writes to
+ * the SQLite profile so the name travels with the food data.
+ */
 export async function setStoredName(nextName: string): Promise<void> {
   const trimmed = nextName.trim();
-  await AsyncStorage.setItem(NAME_KEY, trimmed);
-  setState({ name: trimmed || null, initializing: false });
+  await saveProfileName(trimmed);
+  setState({ name: trimmed || null });
 }
 
-/** Test/reload helper: forget the cached promise so the next read re-runs. */
+/**
+ * Marks onboarding complete (persisted) and refreshes the shared snapshot.
+ * Called by the goals step of the onboarding flow, or by the skip path.
+ */
+export async function completeOnboarding(): Promise<void> {
+  await setOnboardingComplete();
+  setState({ hasCompletedOnboarding: true, initializing: false });
+}
+
+/**
+ * Marks just the walkthrough as seen. Kept separate from onboarding so a
+ * crash mid-walkthrough never forces the user through the name/goals steps
+ * again — only the walkthrough replays.
+ */
+export async function completeWalkthrough(): Promise<void> {
+  await setAppPref(USER_PREF_KEYS.walkthrough, "true");
+}
+
+/**
+ * Dev/testing helper: forget the onboarding flag and the walkthrough flag so
+ * the full first-run experience plays again. Does NOT delete food data.
+ */
+export async function resetOnboardingForTests(): Promise<void> {
+  try {
+    await setAppPref(USER_PREF_KEYS.onboarding, "false");
+    await setAppPref(USER_PREF_KEYS.walkthrough, "false");
+  } catch {
+    // Best-effort: the in-memory state below is what tests observe.
+  }
+  setState({ hasCompletedOnboarding: false });
+}
+
+/** Forget the cached promise so the next read re-runs (retry paths/tests). */
 export function resetAuthStoreForTests(): void {
+  resetDbConnection();
   loadPromise = null;
-  state = { name: null, initializing: true };
+  state = { name: null, hasCompletedOnboarding: false, initializing: true };
 }

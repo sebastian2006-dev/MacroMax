@@ -17,6 +17,14 @@ export default function TabsLayout() {
         // Keep the ribbon pinned even while the soft keyboard is open on
         // Android — an adjustResize/edge-to-edge race could leave it hidden.
         tabBarHideOnKeyboard: false,
+        // PERFORMANCE: unfocused tabs are frozen in place — their component
+        // tree stays mounted (so switching back is instant, no re-fetch,
+        // no loading flash) but they stop re-rendering on every parent
+        // update. Memory is reclaimed for frozen screens under pressure.
+        freezeOnBlur: true,
+        // Keep adjacent screens mounted during the transition so a tab
+        // switch never paints a blank frame first.
+        lazy: true,
       }}
       tabBar={(props) => <ScrollableTabBar {...props} />}
     >

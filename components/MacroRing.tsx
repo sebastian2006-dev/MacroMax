@@ -7,27 +7,29 @@ import Animated, {
   withTiming,
   Easing,
 } from "react-native-reanimated";
-import { COLORS, MACRO_TRACKS } from "@/src/theme/colors";
+import { RING_TRACK_ALPHA, withAlpha } from "@/src/theme/colors";
 import { SHADOWS } from "@/src/theme/shadows";
 import { TILE_MAX_FONT_SCALE } from "@/src/theme/typography";
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
-const FALLBACK_TRACK = "#EEF1F7";
-
-function trackForColor(color: string): string {
-  if (color === COLORS.primary) return MACRO_TRACKS.calories;
-  if (color === COLORS.secondary) return MACRO_TRACKS.protein;
-  if (color === COLORS.tertiary) return MACRO_TRACKS.carbs;
-  return FALLBACK_TRACK;
-}
+/** Arc fill duration — long enough to read as "filling", short enough to feel snappy. */
+const FILL_DURATION_MS = 700;
 
 interface MacroRingProps {
   label: string;
   value: number;
   unit: string;
+  /** Daily goal. 0/null/NaN renders the unfilled "goal not set" state. */
   target?: number | null;
+  /**
+   * True when `target` came from DEFAULT_GOAL_TARGETS rather than the user's
+   * profile — the caption then says so instead of pretending it was chosen.
+   */
+  isDefaultGoal?: boolean;
   color: string;
+  /** Track behind the arc; defaults to a 10% tint of `color`. */
+  trackColor?: string;
   size?: number;
   strokeWidth?: number;
 }
@@ -50,21 +52,31 @@ export const MacroRing = React.memo(function MacroRing({
   value,
   unit,
   target,
+  isDefaultGoal = false,
   color,
+  trackColor,
   size = 132,
   strokeWidth = 12,
 }: MacroRingProps) {
-  const hasTarget = typeof target === "number" && target > 0;
+  // Defensive coercion: a NaN/Infinity here would poison strokeDashoffset and
+  // make the whole ring disappear rather than merely look wrong.
+  const safeValue = Number.isFinite(value) ? Math.max(0, value) : 0;
+  const safeTarget =
+    typeof target === "number" && Number.isFinite(target) && target > 0 ? target : null;
+  const hasTarget = safeTarget !== null;
+
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
-  const progress = hasTarget ? Math.min(1, Math.max(0, value / (target as number))) : 0;
-  const trackColor = trackForColor(color);
+  const progress = hasTarget ? Math.min(1, safeValue / safeTarget) : 0;
+  // Unfilled arc = the ring's own color at 10% opacity, so each ring's track
+  // matches its fill instead of borrowing a generic grey/blue tint.
+  const resolvedTrack = trackColor ?? withAlpha(color, RING_TRACK_ALPHA);
 
   const animatedProgress = useSharedValue(0);
 
   useEffect(() => {
     animatedProgress.value = withTiming(progress, {
-      duration: 700,
+      duration: FILL_DURATION_MS,
       easing: Easing.out(Easing.cubic),
     });
     // progress is a derived primitive (number), safe as an effect dep —
@@ -76,14 +88,25 @@ export const MacroRing = React.memo(function MacroRing({
   }));
 
   return (
-    <View className="flex-1 items-center rounded-2xl bg-card p-4" style={SHADOWS.card}>
-      <View style={{ width: "100%", maxWidth: size, aspectRatio: 1 }}>
+    /*
+     * LAYOUT-STABILITY CONTRACT (see the dashboard overlap glitch):
+     *  - NO flex-1 on the card: its height must come from content, not from
+     *    a flexible parent, or a transient measure of 0 lets neighbours
+     *    slide up and overlap the rings.
+     *  - The SVG box has a FIXED pixel height (size) instead of
+     *    aspectRatio — aspectRatio can resolve to 0 during Fabric's first
+     *    measure passes on Android, collapsing the arc into the calendar.
+     *  - overflow-hidden clips the stroke cap so it can never paint outside
+     *    the rounded card while animating.
+     */
+    <View className="w-full items-center overflow-hidden rounded-2xl bg-card p-4" style={SHADOWS.card}>
+      <View style={{ width: "100%", maxWidth: size, height: size }}>
         <Svg width="100%" height="100%" viewBox={`0 0 ${size} ${size}`}>
           <Circle
             cx={size / 2}
             cy={size / 2}
             r={radius}
-            stroke={trackColor}
+            stroke={resolvedTrack}
             strokeWidth={strokeWidth}
             fill="none"
           />
@@ -98,6 +121,9 @@ export const MacroRing = React.memo(function MacroRing({
                 fill="none"
                 strokeLinecap="round"
                 strokeDasharray={circumference}
+                // Static starting offset so a full ring can never flash for one
+                // frame before the animated value (0 on mount) takes over.
+                strokeDashoffset={circumference}
                 animatedProps={animatedProps}
               />
             </G>
@@ -109,7 +135,7 @@ export const MacroRing = React.memo(function MacroRing({
             maxFontSizeMultiplier={TILE_MAX_FONT_SCALE}
             className="text-3xl font-manrope-extrabold text-ink"
           >
-            {Math.round(value)}
+            {Math.round(safeValue)}
           </Text>
           <Text
             numberOfLines={1}
@@ -134,7 +160,10 @@ export const MacroRing = React.memo(function MacroRing({
           maxFontSizeMultiplier={TILE_MAX_FONT_SCALE}
           className="text-center text-xs font-manrope text-ink-muted"
         >
-          {Math.round(value)} / {Math.round(target)} {unit}
+          {Math.round(safeValue)} / {Math.round(safeTarget)} {unit}
+          {isDefaultGoal ? (
+            <Text className="text-ink-faint"> · default</Text>
+          ) : null}
         </Text>
       ) : (
         <Text

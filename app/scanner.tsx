@@ -129,7 +129,7 @@ function ScanResultCard({ result, mealTypeFromParams, onAdd, onDismiss }: ScanRe
               <Text
                 className={`text-xs ${
                   active
-                    ? "font-manrope-bold text-card"
+                    ? "font-manrope-bold text-ink"
                     : "font-manrope-semibold text-ink-muted"
                 }`}
               >
@@ -163,9 +163,9 @@ function ScanResultCard({ result, mealTypeFromParams, onAdd, onDismiss }: ScanRe
           accessibilityRole="button"
         >
           {adding ? (
-            <ActivityIndicator color={COLORS.card} />
+            <ActivityIndicator color={COLORS.ink} />
           ) : (
-            <Text className="font-manrope-bold text-center text-card">
+            <Text className="font-manrope-bold text-center text-ink">
               Add to {mealType}
             </Text>
           )}
@@ -240,7 +240,7 @@ function ScannerContent() {
             className="rounded-3xl bg-primary py-3.5"
             accessibilityRole="button"
           >
-            <Text className="font-manrope-bold text-center text-card">
+            <Text className="font-manrope-bold text-center text-ink">
               Grant Permission
             </Text>
           </Pressable>
@@ -268,7 +268,7 @@ function ScannerContent() {
         <Pressable
           onPress={() => router.back()}
           accessibilityLabel="Close scanner"
-          className="absolute right-4 rounded-full bg-card/15 p-2.5"
+          className="absolute right-4 rounded-full bg-card/25 p-2.5"
           style={{ top: insets.top + 52 }}
         >
           <Ionicons name="close" size={18} color={COLORS.card} />

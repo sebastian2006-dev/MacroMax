@@ -39,6 +39,7 @@ export default function RootLayout() {
       custom tab bar paint under/over the system gesture bar and glitch.
     */
     <SafeAreaProvider initialMetrics={initialWindowMetrics}>
+      {/* Dark glyphs: every surface behind the status bar is light. */}
       <StatusBar style="dark" />
       <Stack
         screenOptions={{

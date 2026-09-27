@@ -69,7 +69,7 @@ function Segment({ label, active, disabled, onPress }: SegmentProps) {
     >
       <Text
         className={`text-center text-[13px] ${
-          active ? "font-manrope-bold text-primary" : "font-manrope-semibold text-ink-muted"
+          active ? "font-manrope-bold text-primary-ink" : "font-manrope-semibold text-ink-muted"
         }`}
       >
         {label}
@@ -167,7 +167,9 @@ export const ServingInput = memo(
                 >
                   <Text
                     className={`text-xs ${
-                      selected ? "font-manrope-bold text-secondary" : "font-manrope-medium text-ink-muted"
+                      selected
+                        ? "font-manrope-bold text-secondary-ink"
+                        : "font-manrope-medium text-ink-muted"
                     }`}
                   >
                     {portion.label}
@@ -181,7 +183,9 @@ export const ServingInput = memo(
 
         {/* Quantity row */}
         <View className="flex-row items-center">
-          <View className="mr-3 rounded-3xl bg-card px-2" style={SHADOWS.card}>
+          {/* Inset field: `wash` reads as an input on the card, `card` would
+              disappear into the surface it sits on. */}
+          <View className="mr-3 rounded-3xl bg-wash px-2" style={SHADOWS.card}>
             <TextInput
               value={state.quantity}
               onChangeText={(quantity) => onChange({ ...state, quantity })}

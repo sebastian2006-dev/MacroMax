@@ -1,6 +1,7 @@
 import React, { memo } from "react";
 import { Pressable, Text, useWindowDimensions, View } from "react-native";
 import { toLocalDateString } from "@/src/lib/nutrition";
+import { COLORS } from "@/src/theme/colors";
 
 interface WeekStripProps {
   /** Seven dates (Monday → Sunday) to render, in order. */
@@ -60,9 +61,9 @@ export const WeekStrip = memo(function WeekStrip({
             left: selectedIndex * (chipWidth + CHIP_GAP),
             width: chipWidth,
             height: CHIP_HEIGHT,
-            shadowColor: "#000",
-            shadowOpacity: 0.18,
-            shadowRadius: 6,
+            shadowColor: "#0F172A",
+            shadowOpacity: 0.22,
+            shadowRadius: 8,
             shadowOffset: { width: 0, height: 3 },
             elevation: 4,
             transform: [{ scale: 1.04 }],
@@ -97,7 +98,7 @@ export const WeekStrip = memo(function WeekStrip({
             <Text
               numberOfLines={1}
               maxFontSizeMultiplier={1.4}
-              className={`text-center text-[11px] font-manrope ${isSelected ? "text-card" : "text-ink-muted"
+              className={`text-center text-[11px] font-manrope ${isSelected ? "text-ink" : "text-ink-muted"
                 }`}
             >
               {date.toLocaleDateString("en-US", { weekday: "short" })}
@@ -105,7 +106,7 @@ export const WeekStrip = memo(function WeekStrip({
             <Text
               numberOfLines={1}
               maxFontSizeMultiplier={1.4}
-              className={`text-center text-base font-manrope-bold ${isSelected ? "text-card" : "text-ink"
+              className={`text-center text-base font-manrope-bold ${isSelected ? "text-ink" : "text-ink"
                 }`}
             >
               {date.getDate()}
@@ -121,7 +122,8 @@ export const WeekStrip = memo(function WeekStrip({
                     width: TODAY_DOT_SIZE,
                     height: TODAY_DOT_SIZE,
                     borderRadius: TODAY_DOT_SIZE / 2,
-                    backgroundColor: isSelected ? "#FFFFFF" : "#00000066",
+                    // Dark dot on the mint selected chip, slate dot on the light wash.
+                    backgroundColor: isSelected ? COLORS.ink : COLORS.inkFaint,
                   }}
                 />
               ) : null}
@@ -145,7 +147,7 @@ export const WeekStrip = memo(function WeekStrip({
           <Text
             numberOfLines={1}
             maxFontSizeMultiplier={1.4}
-            className="text-[11px] font-manrope-semibold text-primary"
+            className="text-[11px] font-manrope-semibold text-primary-ink"
           >
             Today
           </Text>

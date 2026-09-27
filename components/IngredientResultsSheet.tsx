@@ -109,7 +109,7 @@ export const IngredientResultsSheet = memo(
 
           {loading && results.length === 0 ? (
             <View className="flex-1 items-center justify-center">
-              <ActivityIndicator color={COLORS.primary} />
+              <ActivityIndicator color={COLORS.primaryInk} />
               <Text className="font-manrope mt-3 text-sm text-ink-muted">Searching foods…</Text>
             </View>
           ) : (

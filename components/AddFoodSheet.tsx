@@ -139,7 +139,7 @@ export const AddFoodSheet = memo(
                 <Text
                   className={`text-xs ${
                     active
-                      ? "font-manrope-bold text-card"
+                      ? "font-manrope-bold text-ink"
                       : "font-manrope-semibold text-ink-muted"
                   }`}
                 >
@@ -171,9 +171,9 @@ export const AddFoodSheet = memo(
           accessibilityRole="button"
         >
           {adding ? (
-            <ActivityIndicator color={COLORS.card} />
+            <ActivityIndicator color={COLORS.ink} />
           ) : (
-            <Text className="font-manrope-bold text-center text-base text-card">
+            <Text className="font-manrope-bold text-center text-base text-ink">
               Add to {mealType}
             </Text>
           )}

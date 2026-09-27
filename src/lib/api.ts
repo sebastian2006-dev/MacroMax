@@ -8,8 +8,6 @@ import {
 } from "@/src/lib/db";
 import { searchFallbackFoods } from "@/src/lib/fallbackFoods";
 import { searchFatSecret } from "@/src/lib/fatSecret";
-import { searchOpenFoodFacts, searchOpenFoodFactsByBarcode } from "@/src/lib/openFoodFacts";
-import { safeResolve } from "@/src/lib/http";
 import {
   cacheRowsFromResults,
   dedupeResults,
@@ -18,6 +16,9 @@ import {
   sortSearchResults,
   toSearchResult,
 } from "@/src/lib/foodResults";
+import { searchOpenFoodFacts, searchOpenFoodFactsByBarcode } from "@/src/lib/openFoodFacts";
+import { searchSeedDb } from "@/src/lib/seedDb";
+import { safeResolve } from "@/src/lib/http";
 import { reportSearchSources, SyncSource } from "@/src/lib/syncStatus";
 
 async function searchLocalCache(query: string): Promise<SearchResult[]> {
@@ -57,7 +58,7 @@ async function searchCustomRecipes(userId: string | null, query: string): Promis
   }
 }
 
-/** Persist remote provider results so repeats work offline. */
+/** Persist remote provider results so repeats work offline (Tier 2). */
 async function cacheResults(results: SearchResult[]): Promise<void> {
   const rows = cacheRowsFromResults(results);
   if (rows.length === 0) {
@@ -72,61 +73,79 @@ async function cacheResults(results: SearchResult[]): Promise<void> {
 }
 
 /**
- * Search foods with a strict LOCAL-FIRST strategy:
+ * The 3-Tier Smart Search waterfall.
  *
- *   1. On-device layer, queried first and in parallel:
- *        - saved custom dishes (always surfaced, pinned to the top),
- *        - the food cache (mirrors earlier lookups — offline repeats),
- *        - the built-in reference list (static DB, never empty for staples).
- *   2. If the local layer already returns enough matches
- *      (>= LOCAL_SUFFICIENCY_THRESHOLD) we STOP here — no network at all.
- *   3. Otherwise the remote providers are queried in PARALLEL to top up:
- *        - FatSecret: raw ingredients, cooked dishes, Indian foods (text).
- *        - Open Food Facts: packaged products (search + portions).
+ * ┌────────────────────────────────────────────────────────┐
+ * │                   User Search Input                    │
+ * └───────────────────────────┬────────────────────────────┘
+ *                             ▼
+ *  TIER 1  Local pre-bundled seed DB (expo-sqlite + FTS5)
+ *          → ≥ 5 matches? sort and STOP (zero cost, zero latency)
+ *                             ▼
+ *  TIER 2  Local user layer — write-through cache from previous
+ *          API hits + saved dishes + built-in staples
+ *          → ≥ 5 matches? sort and STOP (still offline)
+ *                             ▼
+ *  TIER 3  Remote APIs (FatSecret + Open Food Facts, parallel)
+ *          → every API result is written back into the Tier 2
+ *            cache so the same search never hits the API again
  *
- * Everything is finally run through the SAME relevance sort, so local and
- * remote rows are ranked by one consistent 3-tier algorithm. Every provider is
- * individually guarded, so a missing key, timeout or bad response can never
- * crash the app or reject the whole search.
+ * Every exit path funnels through the SAME unified relevance sort
+ * (sortSearchResults): raw ingredients → prepared variations → dishes,
+ * with saved custom dishes pinned on top.
+ *
+ * Note on Tier 2: saved custom dishes and the built-in staples list are
+ * merged in whenever Tier 1 alone is thin. They are free, instant, and
+ * user-owned, so they never justify an API call on their own — but they
+ * must never be hidden behind a Tier 1 sufficiency shortcut either.
+ *
+ * Every tier is individually guarded (safeResolve), so a missing seed DB,
+ * a full cache, or a dead network degrades to the next tier — never a crash.
  */
-export async function searchFoods(query: string, userId?: string | null): Promise<SearchResult[]> {
+export async function searchFoodPipeline(
+  query: string,
+  userId?: string | null
+): Promise<SearchResult[]> {
   const trimmed = query.trim();
   if (!trimmed) {
     reportSearchSources([], { remoteAttempted: false, remoteFailed: false });
     return [];
   }
 
-  const collected: SearchResult[] = [];
   const sources = new Set<SyncSource>();
 
-  // 1) LOCAL LAYER FIRST — saved dishes + on-device cache + built-in DB.
-  const [customRecipes, cached, builtIn] = await Promise.all([
-    safeResolve(() => searchCustomRecipes(userId ?? null, trimmed), []),
-    safeResolve(() => searchLocalCache(trimmed), []),
-    Promise.resolve(searchFallbackFoods(trimmed)),
-  ]);
-
-  if (customRecipes.length > 0) {
-    sources.add("custom_recipe");
-    collected.push(...customRecipes);
+  // ── TIER 1: pre-bundled ingredient database (read-only, offline) ──────────
+  const tier1 = await safeResolve(() => searchSeedDb(trimmed), []);
+  if (tier1.length > 0) {
+    sources.add("fallback"); // bundled reference data surfaces as "Local"
   }
-  if (cached.length > 0) {
-    sources.add("local_cache");
-    collected.push(...cached);
-  }
-  if (builtIn.length > 0) {
-    sources.add("fallback");
-    collected.push(...builtIn);
+  let results = dedupeResults(tier1);
+
+  // ── TIER 2: local user layer — only when Tier 1 is insufficient ───────────
+  if (!isLocalSufficient(results.length, LOCAL_SUFFICIENCY_THRESHOLD)) {
+    const [customRecipes, cached, builtIn] = await Promise.all([
+      safeResolve(() => searchCustomRecipes(userId ?? null, trimmed), []),
+      safeResolve(() => searchLocalCache(trimmed), []),
+      Promise.resolve(safeResolveSync(() => searchFallbackFoods(trimmed), [])),
+    ]);
+
+    if (customRecipes.length > 0) {
+      sources.add("custom_recipe");
+    }
+    if (cached.length > 0) {
+      sources.add("local_cache");
+    }
+    if (builtIn.length > 0) {
+      sources.add("fallback");
+    }
+    results = dedupeResults([...customRecipes, ...cached, ...builtIn, ...results]);
   }
 
-  const localMatches = dedupeResults(collected);
-
-  // 2) Enough local matches? Return them and STOP — never touch the network.
   let remoteAttempted = false;
   let remoteFailed = false;
 
-  if (!isLocalSufficient(localMatches.length, LOCAL_SUFFICIENCY_THRESHOLD)) {
-    // 3) Remote providers in parallel — only reached when local is thin.
+  // ── TIER 3: remote APIs — only when both local tiers are insufficient ─────
+  if (!isLocalSufficient(results.length, LOCAL_SUFFICIENCY_THRESHOLD)) {
     remoteAttempted = true;
     remoteFailed = true;
 
@@ -135,26 +154,44 @@ export async function searchFoods(query: string, userId?: string | null): Promis
       safeResolve(() => searchOpenFoodFacts(trimmed), []),
     ]);
 
+    const remoteResults = dedupeResults([...fatSecretResults, ...offResults]);
+
     if (fatSecretResults.length > 0) {
-      remoteFailed = false;
       sources.add("fatsecret");
-      collected.push(...fatSecretResults);
+      remoteFailed = false;
     }
     if (offResults.length > 0) {
-      remoteFailed = false;
       sources.add("open_food_facts");
-      collected.push(...offResults);
+      remoteFailed = false;
     }
+
+    // CRITICAL: write every API hit into the Tier 2 cache (fire-and-forget is
+    // fine — the current search must not wait on the persistence round-trip).
+    if (remoteResults.length > 0) {
+      void cacheResults(remoteResults);
+    }
+
+    results = dedupeResults([...results, ...remoteResults]);
   }
 
-  // One unified relevance sort for both local and remote results:
-  // basic ingredients → prepared variations → complex dishes.
-  const results = sortSearchResults(dedupeResults(collected), trimmed);
-  await cacheResults(results);
-
+  // ── Unified relevance sort on every exit path ─────────────────────────────
+  const ranked = sortSearchResults(results, trimmed).slice(0, 30);
   reportSearchSources([...sources], { remoteAttempted, remoteFailed });
-  return results.slice(0, 30);
+  return ranked;
 }
+
+/** Run a synchronous producer, swallowing failures into the fallback. */
+function safeResolveSync<T>(producer: () => T, fallback: T): T {
+  try {
+    return producer();
+  } catch (error) {
+    console.warn("Food lookup step failed", error);
+    return fallback;
+  }
+}
+
+/** @deprecated Renamed to {@link searchFoodPipeline}. Kept for back-compat. */
+export const searchFoods = searchFoodPipeline;
 
 /**
  * Barcode lookup:
@@ -180,7 +217,7 @@ export async function searchFoodByBarcode(barcode: string): Promise<SearchResult
 
   const result = await safeResolve(() => searchOpenFoodFactsByBarcode(cleaned), null);
   if (result) {
-    await cacheResults([result]);
+    void cacheResults([result]);
     reportSearchSources(["open_food_facts"], { remoteAttempted: true, remoteFailed: false });
     return result;
   }

@@ -1,9 +1,10 @@
 import React, { memo, useCallback, useEffect, useRef } from "react";
 import { Pressable, ScrollView, Text, useWindowDimensions, View } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { BottomTabBarProps } from "expo-router/tabs";
 import { Ionicons } from "@expo/vector-icons";
-import { COLORS } from "@/src/theme/colors";
+import { BRAND, COLORS } from "@/src/theme/colors";
 import { SHADOWS } from "@/src/theme/shadows";
 import { MAX_TAB_SCALE, tabBarMetrics } from "@/src/lib/tabBarLayout";
 
@@ -105,7 +106,7 @@ export const ScrollableTabBar = memo(function ScrollableTabBar({
           }
           const options = descriptors[route.key]?.options;
           const label = (options?.title as string | undefined) ?? item.label;
-          const color = isFocused ? COLORS.primary : COLORS.inkFaint;
+          const color = isFocused ? BRAND.mint : COLORS.inkFaint;
 
           const onPress = () => {
             const event = navigation.emit({
@@ -133,23 +134,45 @@ export const ScrollableTabBar = memo(function ScrollableTabBar({
               style={{ width: itemWidth }}
               className="items-center justify-center"
             >
-              <View
-                className={`items-center justify-center rounded-full px-3 ${
-                  isFocused ? "bg-primary-soft" : "bg-transparent"
-                }`}
-                style={{ minHeight: 30 * scale }}
-              >
-                <Ionicons
-                  name={isFocused ? item.iconActive : item.icon}
-                  size={Math.round(22 * scale)}
-                  color={color}
-                />
-              </View>
+              {isFocused ? (
+                /* Brand-gradient pill behind the active tab icon/logo band. */
+                <View
+                  className="items-center justify-center rounded-full px-3"
+                  style={{ minHeight: 30 * scale }}
+                >
+                  {/* Mint → mint-green only: the icon sits ON the pill, and this
+                      pair holds the dark ink at 6:1+ across its whole sweep. */}
+                  <LinearGradient
+                    colors={[BRAND.mint, BRAND.mintGreen]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={{ borderRadius: 999, paddingVertical: 3, paddingHorizontal: 12 }}
+                  >
+                    <Ionicons
+                      name={item.iconActive}
+                      size={Math.round(22 * scale)}
+                      // The icon sits on the mint pill, so it takes dark ink.
+                      color={COLORS.ink}
+                    />
+                  </LinearGradient>
+                </View>
+              ) : (
+                <View
+                  className="items-center justify-center rounded-full bg-transparent px-3"
+                  style={{ minHeight: 30 * scale }}
+                >
+                  <Ionicons
+                    name={item.icon}
+                    size={Math.round(22 * scale)}
+                    color={color}
+                  />
+                </View>
+              )}
               <Text
                 numberOfLines={1}
                 maxFontSizeMultiplier={MAX_TAB_SCALE}
                 className={`mt-0.5 px-0.5 text-[11px] ${
-                  isFocused ? "font-manrope-bold text-primary" : "font-manrope-semibold text-ink-faint"
+                  isFocused ? "font-manrope-bold text-primary-ink" : "font-manrope-semibold text-ink-faint"
                 }`}
               >
                 {label}

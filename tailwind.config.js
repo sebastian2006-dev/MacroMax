@@ -13,47 +13,75 @@ module.exports = {
   theme: {
     extend: {
       // ------------------------------------------------------------------
-      // Vitality Core design tokens (mirrored in src/theme/colors.ts)
+      // Light "Emerald Ring" design tokens (mirrored in src/theme/colors.ts).
+      //
+      // The brand emerald #10B981 is bright: 2.54:1 on white both as text and
+      // under white text. So it stays a FILL token, and `.ink` siblings carry
+      // every label/value (primary-ink 5.5:1, secondary-ink 6.7:1,
+      // tertiary-ink 5.0:1). test/themeContrast.test.ts asserts all of it.
       // ------------------------------------------------------------------
       colors: {
-        // App background / surface (clean, cool near-white)
-        surface: "#F9F9FF",
-        // Elevated card surface
+        // App background (airy mint-gray) + card surface (pure white)
+        surface: "#F4F9F6",
         card: "#FFFFFF",
-        // Text ramp derived from the core ink color #111C2D
+        // Text ramp: ink 17.9:1, muted 4.8:1, faint 4.6:1 on white
         ink: {
-          DEFAULT: "#111C2D",
-          muted: "#5D6B7E",
-          faint: "#98A1B0"
+          DEFAULT: "#0F172A",
+          muted: "#5F7085",
+          faint: "#66788E"
         },
-        // Primary — Calories / Success (Vibrant Green)
+        // Primary — brand emerald (fill) + its text-safe ink
         primary: {
-          DEFAULT: "#006C49",
-          deep: "#005239",
-          soft: "#E3F1EC"
+          DEFAULT: "#10B981",
+          ink: "#047857",
+          deep: "#047857",
+          soft: "#E7F8F1"
         },
-        // Secondary — Protein (Deep Blue)
+        // Secondary — Protein (logo electric-blue arc)
         secondary: {
-          DEFAULT: "#0058BE",
-          deep: "#004494",
-          soft: "#E7EFFA"
+          DEFAULT: "#3B82F6",
+          ink: "#1D4ED8",
+          deep: "#1D4ED8",
+          soft: "#E8F1FE"
         },
-        // Tertiary — Carbs & Fats (Bright Orange)
+        // Tertiary — Fats & warnings (logo amber arc)
         tertiary: {
-          DEFAULT: "#9D4300",
-          deep: "#7A3400",
-          soft: "#F8EEE6"
+          DEFAULT: "#F5A623",
+          ink: "#B45309",
+          deep: "#B45309",
+          soft: "#FDF3E3"
         },
-        // Destructive actions (delete etc.) — kept minimal & tinted
+        // Carbs — the mint-green sibling of the top-left arc
+        mint: {
+          DEFAULT: "#34D399",
+          soft: "#5EEAD4",
+          ink: "#0F766E"
+        },
+        // Destructive actions
         danger: {
           DEFAULT: "#DC2626",
-          soft: "#FCEBEA"
+          soft: "#FDECEC"
         },
-        // Neutral wash for segmented controls, tracks & subtle fills
+        // Brand gradient: the logo's three arcs (decorative beds and pills).
+        // `wordmark*` are the deeper siblings used when the gradient IS text.
+        brand: {
+          mint: "#2DD4BF",
+          mintSoft: "#5EEAD4",
+          blue: "#3B82F6",
+          blueSoft: "#7CB6FB",
+          amber: "#F5A623",
+          amberSoft: "#FBD07C",
+          wordmarkFrom: "#047857",
+          wordmarkMid: "#1D4ED8",
+          wordmarkTo: "#B45309"
+        },
+        // Inset fields, chips and tracks; `deep` is the selected/stronger step
         wash: {
-          DEFAULT: "#F1F3FA",
-          deep: "#E6E9F3"
-        }
+          DEFAULT: "#EDF3EF",
+          deep: "#E3EDE7"
+        },
+        // Borders, dividers and dashed outlines
+        edge: "#E5E7EB"
       },
       // Manrope is the only typeface in the app. Each weight is registered as
       // its own native font family (Android cannot synthesize weights), so we

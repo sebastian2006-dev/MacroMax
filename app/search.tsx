@@ -127,8 +127,8 @@ function SearchContent() {
               className="flex-row items-center rounded-full bg-card px-4 py-2"
               style={SHADOWS.card}
             >
-              <Ionicons name="barcode-outline" size={14} color={COLORS.primary} />
-              <Text className="font-manrope-semibold ml-1.5 text-xs text-primary">Scan</Text>
+              <Ionicons name="barcode-outline" size={14} color={COLORS.primaryInk} />
+              <Text className="font-manrope-semibold ml-1.5 text-xs text-primary-ink">Scan</Text>
             </Pressable>
           </View>
 
@@ -140,7 +140,7 @@ function SearchContent() {
             >
               <Text
                 className={`text-center text-sm ${
-                  tab === "dishes" ? "font-manrope-bold text-primary" : "font-manrope-semibold text-ink-muted"
+                  tab === "dishes" ? "font-manrope-bold text-primary-ink" : "font-manrope-semibold text-ink-muted"
                 }`}
               >
                 My Dishes ({dishes.length})
@@ -153,7 +153,7 @@ function SearchContent() {
             >
               <Text
                 className={`text-center text-sm ${
-                  tab === "database" ? "font-manrope-bold text-primary" : "font-manrope-semibold text-ink-muted"
+                  tab === "database" ? "font-manrope-bold text-primary-ink" : "font-manrope-semibold text-ink-muted"
                 }`}
               >
                 Search Database
@@ -190,7 +190,7 @@ function SearchContent() {
                   onPress={() => router.push("/recipe")}
                   className="mt-4 rounded-3xl bg-primary py-3"
                 >
-                  <Text className="font-manrope-bold text-center text-card">
+                  <Text className="font-manrope-bold text-center text-ink">
                     Go to Custom Dish
                   </Text>
                 </Pressable>
@@ -198,7 +198,7 @@ function SearchContent() {
                   onPress={() => setTab("database")}
                   className="mt-2 rounded-3xl bg-primary-soft py-3"
                 >
-                  <Text className="font-manrope-semibold text-center text-primary">
+                  <Text className="font-manrope-semibold text-center text-primary-ink">
                     Or search the food database
                   </Text>
                 </Pressable>
@@ -235,7 +235,7 @@ function SearchContent() {
             <>
               {loading ? (
                 <View className="mt-8 items-center">
-                  <ActivityIndicator color={COLORS.primary} />
+                  <ActivityIndicator color={COLORS.primaryInk} />
                 </View>
               ) : null}
 
@@ -282,7 +282,7 @@ function SearchContent() {
                 className="mt-2 rounded-2xl bg-card p-4"
                 style={SHADOWS.card}
               >
-                <Text className="font-manrope-semibold text-center text-primary">
+                <Text className="font-manrope-semibold text-center text-primary-ink">
                   Build a custom dish from ingredients
                 </Text>
               </Pressable>

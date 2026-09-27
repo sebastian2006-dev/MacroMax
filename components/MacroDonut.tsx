@@ -1,6 +1,7 @@
 import React, { memo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import Svg, { Circle, G } from "react-native-svg";
+import { COLORS } from "@/src/theme/colors";
 
 export interface MacroDonutSegment {
   key: string;
@@ -33,7 +34,9 @@ export const MacroDonut = memo(function MacroDonut({
   centerLabel,
   size = 148,
   strokeWidth = 18,
-  trackColor = "#E6E9F3",
+  // One step above the card, so the gaps between segments read as a track
+  // rather than a hole punched in the emerald surface.
+  trackColor = COLORS.washDeep,
 }: MacroDonutProps) {
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;

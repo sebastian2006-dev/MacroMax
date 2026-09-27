@@ -11,12 +11,15 @@ import {
   addMacros,
   calculateRollingAverages,
   calculateTotals,
+  DEFAULT_GOAL_TARGETS,
   EMPTY_MACROS,
   getDateNDaysAgo,
   getGoalTargets,
   getLimitAlerts,
   getLowIntakeAlerts,
   groupMealItemsByType,
+  parseGoalInputs,
+  resolveGoalTargets,
   scaleMacros,
   startOfWeek,
   toLocalDateString,
@@ -123,6 +126,86 @@ describe("getGoalTargets()", () => {
       target_fats: null,
     } as Profile;
     assert.deepEqual(getGoalTargets(profile), { calories: 2000, protein: 150, carbs: 0, fats: 0 });
+  });
+});
+
+// ── resolveGoalTargets ───────────────────────────────────────────────────────
+describe("resolveGoalTargets()", () => {
+  const configured = {
+    target_calories: 1800,
+    target_protein: 120,
+    target_carbs: 200,
+    target_fats: 60,
+  } as Profile;
+
+  it("passes fully configured goals through untouched", () => {
+    const { targets, usingDefault } = resolveGoalTargets(configured);
+    assert.deepEqual(targets, { calories: 1800, protein: 120, carbs: 200, fats: 60 });
+    assert.deepEqual(usingDefault, {
+      calories: false,
+      protein: false,
+      carbs: false,
+      fats: false,
+    });
+  });
+
+  it("an all-zero profile borrows every default", () => {
+    const { targets, usingDefault } = resolveGoalTargets({
+      target_calories: 0,
+      target_protein: 0,
+      target_carbs: null,
+      target_fats: null,
+    } as Profile);
+    assert.deepEqual(targets, DEFAULT_GOAL_TARGETS);
+    assert.deepEqual(usingDefault, {
+      calories: true,
+      protein: true,
+      carbs: true,
+      fats: true,
+    });
+  });
+
+  it("fills only the unset macros", () => {
+    const { targets, usingDefault } = resolveGoalTargets({
+      target_calories: 2500,
+      target_protein: 0,
+      target_carbs: 300,
+      target_fats: null,
+    } as Profile);
+    assert.deepEqual(targets, {
+      calories: 2500,
+      protein: DEFAULT_GOAL_TARGETS.protein,
+      carbs: 300,
+      fats: DEFAULT_GOAL_TARGETS.fats,
+    });
+    assert.equal(usingDefault.calories, false);
+    assert.equal(usingDefault.protein, true);
+    assert.equal(usingDefault.carbs, false);
+    assert.equal(usingDefault.fats, true);
+  });
+
+  it("never yields a non-positive denominator (the empty-ring bug)", () => {
+    const { targets } = resolveGoalTargets({
+      target_calories: NaN,
+      target_protein: -20,
+      target_carbs: null,
+      target_fats: 0,
+    } as Profile);
+    for (const value of Object.values(targets)) {
+      assert.ok(value > 0, `expected a positive goal, got ${value}`);
+    }
+  });
+
+  it("produces a 0..1 progress ratio for logged food against a default goal", () => {
+    const { targets } = resolveGoalTargets({
+      target_calories: 0,
+      target_protein: 0,
+      target_carbs: null,
+      target_fats: null,
+    } as Profile);
+    assert.equal(Math.min(1, 408 / targets.calories), 408 / DEFAULT_GOAL_TARGETS.calories);
+    assert.equal(Math.min(1, 17 / targets.protein), 17 / DEFAULT_GOAL_TARGETS.protein);
+    assert.equal(Math.min(1, 9000 / targets.calories), 1);
   });
 });
 
@@ -334,5 +417,59 @@ describe("groupMealItemsByType()", () => {
     assert.equal(r.Lunch.length, 2);
     assert.equal(r.Dinner.length, 1);
     assert.equal(r["Snacks/Extra"].length, 1);
+  });
+});
+
+// ── parseGoalInputs (onboarding + settings goal fields) ─────────────────────
+describe("parseGoalInputs()", () => {
+  it("parses plain numeric input", () => {
+    assert.deepEqual(parseGoalInputs({ calories: "2000", protein: "140", carbs: "250", fats: "70" }), {
+      target_calories: 2000,
+      target_protein: 140,
+      target_carbs: 250,
+      target_fats: 70,
+    });
+  });
+
+  it("maps blank and whitespace fields to 0 = not configured", () => {
+    assert.deepEqual(parseGoalInputs({ calories: "", protein: "   ", carbs: "", fats: "" }), {
+      target_calories: 0,
+      target_protein: 0,
+      target_carbs: 0,
+      target_fats: 0,
+    });
+  });
+
+  it("maps junk and non-positive input to 0", () => {
+    assert.deepEqual(parseGoalInputs({ calories: "abc", protein: "-5", carbs: "0", fats: "NaN" }), {
+      target_calories: 0,
+      target_protein: 0,
+      target_carbs: 0,
+      target_fats: 0,
+    });
+  });
+
+  it("tolerates surrounding whitespace", () => {
+    assert.equal(parseGoalInputs({ calories: " 2200 ", protein: "", carbs: "", fats: "" }).target_calories, 2200);
+  });
+
+  it("clamps absurd values to sane ceilings", () => {
+    const parsed = parseGoalInputs({ calories: "99999", protein: "5000", carbs: "9999", fats: "8888" });
+    assert.equal(parsed.target_calories, 10_000);
+    assert.equal(parsed.target_protein, 1_000);
+    assert.equal(parsed.target_carbs, 1_000);
+    assert.equal(parsed.target_fats, 1_000);
+  });
+
+  it("floors decimals instead of NaN-ing the column", () => {
+    assert.equal(parseGoalInputs({ calories: "2000.9", protein: "", carbs: "", fats: "" }).target_calories, 2000);
+  });
+
+  it("keeps every field independent — one bad field does not poison the rest", () => {
+    const parsed = parseGoalInputs({ calories: "nope", protein: "150", carbs: "", fats: "65" });
+    assert.equal(parsed.target_calories, 0);
+    assert.equal(parsed.target_protein, 150);
+    assert.equal(parsed.target_carbs, 0);
+    assert.equal(parsed.target_fats, 65);
   });
 });

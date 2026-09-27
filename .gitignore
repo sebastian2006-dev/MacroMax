@@ -25,3 +25,4 @@ ios/
 # Kept untracked on purpose: it currently carries real provider keys, so it must
 # not be committed. Copy it to .env locally instead.
 .env.example
+.ci-bundle-test/

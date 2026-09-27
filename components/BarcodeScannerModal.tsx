@@ -28,6 +28,8 @@ export function BarcodeScannerModal({ visible, onClose, onScanned }: BarcodeScan
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      {/* `ink` is the dark slate in this theme, so it doubles as the camera
+          overlay scrim the way it did before the dark-theme detour. */}
       <View className="flex-1 bg-ink/90">
         <View className="mt-14 flex-row items-center justify-between px-5">
           <Text className="font-manrope-bold text-lg text-card">Scan Barcode</Text>
@@ -50,7 +52,8 @@ export function BarcodeScannerModal({ visible, onClose, onScanned }: BarcodeScan
                 onPress={() => void requestPermission()}
                 className="rounded-3xl bg-primary px-6 py-3"
               >
-                <Text className="font-manrope-bold text-card">Grant Permission</Text>
+                {/* On the bright emerald fill the label takes dark ink. */}
+                <Text className="font-manrope-bold text-ink">Grant Permission</Text>
               </Pressable>
             </View>
           ) : (
@@ -72,7 +75,7 @@ export function BarcodeScannerModal({ visible, onClose, onScanned }: BarcodeScan
         </View>
 
         <View className="pb-10">
-          <Text className="font-manrope text-center text-sm text-card/70">
+          <Text className="font-manrope text-center text-sm text-card/80">
             Align the barcode inside the frame.
           </Text>
         </View>
