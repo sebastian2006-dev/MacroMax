@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="./assets/macromax_A_ring_1024.png" width="300" alt="MacroMax app icon" />
+</div>
+
 # MacroMax
 
 [![CI](https://github.com/sebastian2006-dev/MacroMax/actions/workflows/ci.yml/badge.svg)](https://github.com/sebastian2006-dev/MacroMax/actions/workflows/ci.yml)
