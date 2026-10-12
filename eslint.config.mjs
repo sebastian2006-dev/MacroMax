@@ -26,6 +26,7 @@ export default tseslint.config(
       // under plain node, not the app bundler — RN/browser globals rules and
       // ESM assumptions don't apply to them.
       "scripts/**",
+      "brag-output/**",
     ],
   },
   ...expoConfig,

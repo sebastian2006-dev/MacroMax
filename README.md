@@ -39,13 +39,9 @@ Built natively with React Native (Expo SDK 57), TypeScript strict mode and Nativ
 | :---: | :---: | :---: |
 | <img src="./assets/SC1.jpeg" width="250" alt="Today's Overview" /> | <img src="./assets/SC5.jpeg" width="250" alt="Daily Log" /> | <img src="./assets/SC3.jpeg" width="250" alt="Custom Dish Builder" /> |
 
-<div align="center">
-
-<img src="./assets/SC2.jpeg" width="250" alt="Analytics Dashboard" />&nbsp;&nbsp;&nbsp;<img src="./assets/SC6.jpeg" width="250" alt="Profile & Settings" />
-
-**Analytics Dashboard** &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; **Profile & Settings**
-
-</div>
+| Analytics Dashboard | Profile & Settings |
+| :---: | :---: |
+| <img src="./assets/SC2.jpeg" width="250" alt="Analytics Dashboard" /> | <img src="./assets/SC6.jpeg" width="250" alt="Profile & Settings" /> |
 
 ---
 
