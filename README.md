@@ -39,9 +39,22 @@ Built natively with React Native (Expo SDK 57), TypeScript strict mode and Nativ
 | :---: | :---: | :---: |
 | <img src="./assets/SC1.jpeg" width="250" alt="Today's Overview" /> | <img src="./assets/SC5.jpeg" width="250" alt="Daily Log" /> | <img src="./assets/SC3.jpeg" width="250" alt="Custom Dish Builder" /> |
 
-| Analytics Dashboard | Profile & Settings |
-| :---: | :---: |
-| <img src="./assets/SC2.jpeg" width="250" alt="Analytics Dashboard" /> | <img src="./assets/SC6.jpeg" width="250" alt="Profile & Settings" /> |
+<div align="center">
+  <table>
+    <thead>
+      <tr>
+        <th align="center">Analytics Dashboard</th>
+        <th align="center">Profile &amp; Settings</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td align="center"><img src="./assets/SC2.jpeg" width="250" alt="Analytics Dashboard" /></td>
+        <td align="center"><img src="./assets/SC6.jpeg" width="250" alt="Profile &amp; Settings" /></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
 
 ---
 
@@ -233,15 +246,122 @@ The README badge above always reflects the latest `main` run.
 ## Project Structure
 
 ```text
-app/                    # Expo Router screens ((tabs): index=Today, log, recipe, analytics, settings; login, search, scanner)
-components/             # UI: MacroRing, MacroDonut, WeekStrip, DynamicGreeting, AddFoodSheet, ServingInput, sheets, tab bar
-src/lib/                # Pure core: db (SQLite), nutrition, trendSeries, greeting, walkthrough, backup(Data), api, providers
-src/lib/seedDb.ts       # Tier-1 bundled FTS5 ingredient database
-src/hooks/              # useAuth, useProfile, useDailyLog, useFoodSearch, useWeekLoggedDates…
-src/theme/              # Emerald Ring tokens (colors, shadows, typography) — WCAG-tested
-src/types/              # Shared TypeScript types
-assets/seed.db          # Bundled ingredient database (rebuilt via npm run build:db)
-test/                   # 314 unit tests (Node test runner + tsx)
-scripts/                # build-db.js (seed builder), generate-android-icons.js
-.github/workflows/      # CI (lint → typecheck → test → bundle smoke check)
+MacroMax/
+├── .github/
+│   └── workflows/
+│       └── ci.yml                     # CI pipeline (lint → typecheck → test → bundle smoke check)
+├── app/                               # Expo Router screens
+│   ├── (tabs)/
+│   │   ├── _layout.tsx                # Bottom tab bar layout & navigation
+│   │   ├── index.tsx                  # Today's Overview dashboard & goal rings
+│   │   ├── log.tsx                    # Daily Log (Breakfast, Lunch, Dinner, Snacks)
+│   │   ├── recipe.tsx                 # Custom Dish builder & saved batches
+│   │   ├── analytics.tsx              # Analytics dashboard, trends & macro-split donut
+│   │   └── settings.tsx               # Profile & daily goal targets settings
+│   ├── _layout.tsx                    # Root layout, theme provider & onboarding guard
+│   ├── login.tsx                      # 3-step walkthrough & onboarding
+│   ├── scanner.tsx                    # Barcode scanner screen (camera)
+│   └── search.tsx                     # Food search screen with sliding bottom sheet
+├── assets/                            # Static media & bundled databases
+│   ├── favicon.png                    # Web/app favicon
+│   ├── macromax_A_ring_1024.png       # Canonical app logo (1024x1024)
+│   ├── SC1.jpeg                       # Screenshot: Today's Overview
+│   ├── SC2.jpeg                       # Screenshot: Analytics Dashboard
+│   ├── SC3.jpeg                       # Screenshot: Custom Dish Builder
+│   ├── SC5.jpeg                       # Screenshot: Daily Log
+│   ├── SC6.jpeg                       # Screenshot: Profile & Settings
+│   └── seed.db                        # Bundled Tier-1 FTS5 SQLite ingredient database
+├── components/                        # Reusable UI components
+│   ├── AddFoodSheet.tsx               # Add food sliding sheet modal
+│   ├── AppHeader.tsx                  # Header with time-aware greeting & sync pill
+│   ├── BarcodeScannerModal.tsx        # Camera barcode scanner modal
+│   ├── DynamicGreeting.tsx            # Hour-calibrated greeting banner
+│   ├── IngredientResultsSheet.tsx     # Custom dish ingredient picker
+│   ├── LimitAlertCard.tsx             # Fat limit and dietary alerts
+│   ├── LowIntakeAlertCard.tsx         # Time-gated low-intake nudges
+│   ├── MacroCard.tsx                  # Macro stat overview cards
+│   ├── MacroDonut.tsx                 # Hand-rolled SVG macro-split donut chart
+│   ├── MacroProgressBar.tsx           # Linear macro progress bar
+│   ├── MacroRing.tsx                  # Animated UI-thread circular progress ring
+│   ├── MealSlot.tsx                   # Meal item container with delete & edit
+│   ├── MealTargetSheet.tsx            # Meal goal configuration sheet
+│   ├── RequireAuth.tsx                # Onboarding completion check wrapper
+│   ├── ScrollableTabBar.tsx           # Custom gradient bottom tab bar
+│   ├── SearchBar.tsx                  # Debounced food search input
+│   ├── ServingInput.tsx               # Serving quantity & unit selector
+│   └── WeekStrip.tsx                  # Weekly day-selector strip with indicator dots
+├── scripts/                           # Build & generation utilities
+│   ├── build-db.js                    # Rebuilds assets/seed.db from CSV datasets
+│   ├── generate-android-icons.js      # Generates Android adaptive launcher icons
+│   └── inputs/                        # Raw nutritional datasets (IFCT 2017 & USDA)
+│       ├── foundation_food (2).csv
+│       ├── foundation_food_nutrient.csv
+│       ├── ifct2017_compositions.csv
+│       ├── sr_food.csv
+│       └── sr_food_nutrient.csv
+├── src/
+│   ├── hooks/                         # Custom React hooks
+│   │   ├── useAuth.ts                 # User profile & onboarding status
+│   │   ├── useDailyLog.ts             # Day-specific food logging & totals
+│   │   ├── useDebouncedValue.ts       # Debounce utility hook
+│   │   ├── useFoodSearch.ts           # 3-tier food search orchestration
+│   │   ├── useProfile.ts              # Goals, name, & profile state
+│   │   ├── useSyncStatus.ts           # Search source sync status state
+│   │   └── useWeekLoggedDates.ts      # Active logged dates for the weekly strip
+│   ├── lib/                           # Core business logic (pure, unit-tested)
+│   │   ├── api.ts                     # 3-tier search pipeline (local DB, cache, remote)
+│   │   ├── authStore.ts               # In-memory auth/profile store
+│   │   ├── backup.ts                  # JSON file import/export via share sheet
+│   │   ├── backupData.ts              # Backup serialization & hostile-input validation
+│   │   ├── db.ts                      # SQLite database operations & migrations
+│   │   ├── debounce.ts                # Pure debounce function
+│   │   ├── fallbackFoods.ts           # Built-in offline fallback food database
+│   │   ├── fatSecret.ts               # FatSecret Platform API client (OAuth 2.0)
+│   │   ├── foodLabels.ts              # Food item naming & label utilities
+│   │   ├── foodResults.ts             # Search result deduplication & ranking
+│   │   ├── greeting.ts                # Time-of-day greeting calibration
+│   │   ├── http.ts                    # Defensive HTTP & base64 helpers
+│   │   ├── nutrition.ts               # Nutrition calculations, scaling & goal parsing
+│   │   ├── openFoodFacts.ts           # Open Food Facts API client & parser
+│   │   ├── seedDb.ts                  # Bundled seed database queries (FTS5)
+│   │   ├── servingUnits.ts            # Serving unit conversion (grams, units, portions)
+│   │   ├── syncStatus.ts              # Sync status state pub/sub store
+│   │   ├── tabBarLayout.ts            # Tab bar typography & scale metrics
+│   │   ├── trendSeries.ts             # Chart series bucketing & headroom axis math
+│   │   └── walkthrough.ts            # Onboarding walkthrough slide definitions
+│   ├── theme/                         # Design system tokens
+│   │   ├── colors.ts                  # Emerald Ring palette & WCAG-compliant tokens
+│   │   ├── shadows.ts                 # Platform elevation & shadow presets
+│   │   └── typography.ts              # Font families & scale definitions
+│   └── types/                         # Shared TypeScript interfaces
+│       └── index.ts                   # Core data models (FoodItem, DailyLog, etc.)
+├── test/                              # 314 unit tests (Node test runner + tsx)
+│   ├── api.test.ts                    # 3-tier search pipeline tests
+│   ├── backupData.test.ts             # Backup sanitization & round-trip tests
+│   ├── debounce.test.ts               # Debounce timing tests
+│   ├── fallbackFoods.test.ts          # Offline fallback food database tests
+│   ├── fatSecret.test.ts              # FatSecret mapping & regex parsing tests
+│   ├── greeting.test.ts               # Greeting bucket & boundary flip tests
+│   ├── http.test.ts                   # HTTP helpers & base64 encoding tests
+│   ├── nutrition.test.ts              # Nutrition math, goal parsing & macro tests
+│   ├── openFoodFacts.test.ts          # Open Food Facts mapping & kJ conversion tests
+│   ├── ringColors.test.ts             # Progress ring palette separation tests
+│   ├── servingUnits.test.ts           # Serving units & portion conversion tests
+│   ├── syncStatus.test.ts             # Sync status store & mode resolution tests
+│   ├── tabBarLayout.test.ts           # Tab bar metrics & label fit tests
+│   ├── themeContrast.test.ts          # WCAG contrast ratio compliance tests
+│   └── trendSeries.test.ts            # Chart trend series & headroom ceiling tests
+├── .gitattributes                     # Binary file attributes
+├── .gitignore                         # Git ignore rules
+├── app.json                           # Expo app configuration
+├── babel.config.js                    # Babel config (NativeWind)
+├── eas.json                           # Expo Application Services configuration
+├── eslint.config.mjs                  # ESLint 9 configuration (eslint-config-expo)
+├── global.css                         # Tailwind/NativeWind global stylesheets
+├── global.d.ts                        # Global CSS module declarations
+├── metro.config.js                    # Metro bundler configuration
+├── nativewind-env.d.ts                # NativeWind type definitions
+├── package.json                       # Project dependencies & scripts
+├── tailwind.config.js                 # Tailwind CSS configuration
+└── tsconfig.json                      # Strict TypeScript compiler options
 ```
