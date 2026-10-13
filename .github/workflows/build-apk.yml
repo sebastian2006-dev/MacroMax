@@ -152,7 +152,7 @@ jobs:
               echo "| ABIs | \`arm64-v8a\`, \`armeabi-v7a\`, \`x86\`, \`x86_64\` (emulators included) |"
             fi
             echo "| Artifact | \`$BUILD_ARTIFACT\` |"
-            echo "| FatSecret keys | $([ -n "${EXPO_PUBLIC_FATSECRET_CLIENT_ID:-}" ] && echo 'present' || echo 'not set — offline search tiers only') |"
+            echo "| FatSecret keys | $([ -n "${EXPO_PUBLIC_FATSECRET_CLIENT_ID:-}" ] && echo 'present' || echo 'not set — FatSecret text search disabled, Open Food Facts + offline tiers still active') |"
             echo "| Release keystore | $([ -n "${RELEASE_KEYSTORE_BASE64:-}" ] && echo 'present' || echo 'not set — template debug key') |"
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -283,6 +283,16 @@ jobs:
           OUT="android/app/build/outputs"
           APK=$(find "$OUT/apk/release" -name '*.apk' 2>/dev/null | head -1 || true)
 
+          # Read before the artifact table so the mapping shows up in it.
+          MAPPING="$OUT/mapping/release/mapping.txt"
+          MAPPING_LINES=""
+          if [ -f "$MAPPING" ]; then
+            MAPPING_LINES=$(wc -l < "$MAPPING")
+            echo "R8 mapping: $MAPPING_LINES lines (needed to de-minify any crash trace)"
+          else
+            echo "::warning::No R8 mapping.txt — R8 did not run?"
+          fi
+
           if [ -n "$APK" ]; then
             echo "APK: $APK ($(du -h "$APK" | cut -f1))"
 
@@ -300,13 +310,24 @@ jobs:
               fi
             fi
 
+            # Alignment and signature belong in the summary, not just the log:
+            # they are what makes the APK installable, and the summary is what
+            # is read a month later when the artifact is downloaded.
+            ALIGNMENT="not checked (zipalign unavailable)"
             ZIPALIGN=$(find "${ANDROID_HOME:-/usr/local/lib/android/sdk}/build-tools" -name zipalign 2>/dev/null | sort -V | tail -1 || true)
             if [ -n "$ZIPALIGN" ]; then
-              "$ZIPALIGN" -c -P 16 4 "$APK" && echo "16 KB page alignment: OK"
+              if "$ZIPALIGN" -c -P 16 4 "$APK" > /dev/null 2>&1; then
+                ALIGNMENT="OK (16 KB pages)"
+              else
+                ALIGNMENT="NOT 16 KB page aligned"
+                echo "::warning::$ALIGNMENT — Android 15+ and Play require page-aligned native libs"
+              fi
+              echo "16 KB page alignment: $ALIGNMENT"
             else
               echo "::warning::zipalign not found; skipped the 16 KB alignment check"
             fi
 
+            SIGNER="not checked (apksigner unavailable)"
             APKSIGNER=$(find "${ANDROID_HOME:-/usr/local/lib/android/sdk}/build-tools" -name apksigner 2>/dev/null | sort -V | tail -1 || true)
             if [ -n "$APKSIGNER" ]; then
               # Dump to a file instead of `| head`: cutting a pipe short makes
@@ -314,29 +335,34 @@ jobs:
               # failed build. An unverifiable APK is genuinely fatal.
               "$APKSIGNER" verify --print-certs "$APK" > "$RUNNER_TEMP/apksigner.txt"
               head -6 "$RUNNER_TEMP/apksigner.txt"
+              SIGNER=$(grep -m1 -a 'certificate DN' "$RUNNER_TEMP/apksigner.txt" | sed -E 's/.*certificate DN: //' || true)
+              [ -n "$SIGNER" ] || SIGNER="unknown"
             else
               echo "::warning::apksigner not found; skipped the signature check"
             fi
 
             SIZE_MB=$(( $(stat -c %s "$APK") / 1024 / 1024 ))
+            SHA=$(sha256sum "$APK" | cut -d' ' -f1)
             echo "APK size: ${SIZE_MB} MiB"
+            echo "APK sha256: $SHA"
             if [ "$SIZE_MB" -gt 90 ]; then
               echo "::warning::APK grew to ${SIZE_MB} MiB — check the R8 switches and the ARM-only ABI policy"
             fi
 
             {
               echo
-              echo "| artifact | ABIs | size | sha256 |"
-              echo "| --- | --- | --- | --- |"
-              echo "| $(basename "$APK") | $(echo "$ABIS" | paste -sd ', ' -) | ${SIZE_MB} MiB | \`$(sha256sum "$APK" | cut -c1-16)…\` |"
+              echo "### Artifact checks"
+              echo
+              echo "| check | value |"
+              echo "| --- | --- |"
+              echo "| file | \`$(basename "$APK")\` |"
+              echo "| ABIs | \`$(echo "$ABIS" | paste -sd ', ' -)\` |"
+              echo "| size | ${SIZE_MB} MiB |"
+              echo "| 16 KB alignment | ${ALIGNMENT} |"
+              echo "| signed by | ${SIGNER} |"
+              echo "| R8 mapping | ${MAPPING_LINES:-missing (R8 did not run?)} lines |"
+              echo "| sha256 | \`$SHA\` |"
             } >> "$GITHUB_STEP_SUMMARY"
-          fi
-
-          MAPPING="$OUT/mapping/release/mapping.txt"
-          if [ -f "$MAPPING" ]; then
-            echo "R8 mapping: $(wc -l < "$MAPPING") lines (needed to de-minify any crash trace)"
-          else
-            echo "::warning::No R8 mapping.txt — R8 did not run?"
           fi
 
       # Signing config is applied to the APK (an AAB has no debug-signed step

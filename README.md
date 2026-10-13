@@ -260,11 +260,11 @@ Gradle only starts once the run has proved the generated project really carries 
 
 ### Signing
 
-Out of the box the APK is signed with the debug key the Expo template ships — the same artifact `expo run:android --variant release` produces: **installable on any phone, rejected by Play**. Set all three of `RELEASE_KEYSTORE_BASE64` (base64 of your `.jks`), `RELEASE_KEYSTORE_PASSWORD` and `RELEASE_KEYSTORE_ALIAS` as repository secrets and the run re-signs with your own key instead, then verifies the result.
+Out of the box the APK is signed with the debug key the Expo template ships — the same artifact `expo run:android --variant release` produces: **installable on any phone, rejected by Play**. Set all three of `RELEASE_KEYSTORE_BASE64` (base64 of your `.jks`), `RELEASE_KEYSTORE_PASSWORD` and `RELEASE_KEYSTORE_ALIAS` as repository secrets and an `apk`/`both` build re-signs with your own key instead, then verifies the result. An `aab`-only run has no APK to re-sign, so Play needs your own upload key for that path.
 
 ### Optional provider keys
 
-`EXPO_PUBLIC_FATSECRET_CLIENT_ID`, `EXPO_PUBLIC_FATSECRET_CLIENT_SECRET`, `EXPO_PUBLIC_FATSECRET_REGION` and `EXPO_PUBLIC_OFF_USER_AGENT` are picked up from repository secrets if you define them — see [Environment Variables](#environment-variables). Like a local `.env`, they are compiled *into* the bundle. Leave them unset and the workflow still builds; the app just answers searches from its offline tiers.
+`EXPO_PUBLIC_FATSECRET_CLIENT_ID`, `EXPO_PUBLIC_FATSECRET_CLIENT_SECRET`, `EXPO_PUBLIC_FATSECRET_REGION` and `EXPO_PUBLIC_OFF_USER_AGENT` are picked up from repository secrets if you define them — see [Environment Variables](#environment-variables). Like a local `.env`, they are compiled *into* the bundle. Leave them unset and the build is unaffected: only FatSecret-backed text search goes away (Open Food Facts needs no key and still serves both search and barcode lookups, on top of the bundled database and cache).
 
 ### What the run leaves behind
 
@@ -299,7 +299,7 @@ EAS is untouched by all of this: [eas.json](eas.json) and its profiles still wor
 | `EXPO_PUBLIC_FATSECRET_REGION` | No | Result region, e.g. `IN` |
 | `EXPO_PUBLIC_OFF_USER_AGENT` | Recommended | Descriptive Open Food Facts User-Agent |
 
-The app degrades gracefully without keys: local tiers (seed DB, cache, fallback list) still answer searches.
+Only FatSecret needs a key. Without the FatSecret pair, text search falls back to Open Food Facts (keyless) plus the bundled seed DB, cache and fallback list; barcode scanning and backup/restore are never key-dependent.
 
 ---
 
@@ -357,134 +357,42 @@ GitHub Actions (`.github/workflows/ci.yml`) runs on every push to `main`/`featur
 
 The README badge above always reflects the latest `main` run.
 
-Producing the artifacts is a second, intentionally manual workflow — [Build an APK without EAS](#build-an-apk-without-eas) — so a build only ever happens when someone asks for one.
+Building the app is a second, deliberately manual workflow — a build only ever happens when someone asks for one:
+
+| Workflow | Trigger | What it runs | What you get |
+| --- | --- | --- | --- |
+| [ci.yml](.github/workflows/ci.yml) | every push / PR | `npm run ci`, then a Metro bundle smoke check | a pass/fail badge — nothing to download |
+| [build-apk.yml](.github/workflows/build-apk.yml) | **Actions → Build APK**, or a `v*` tag | those same gates, then `expo prebuild` + the Gradle release build | `MacroMax-<version>-arm.apk` or `.aab`, the R8 mapping, and a GitHub Release on tags |
+
+`build-apk.yml` is the no-EAS path: inputs, signing, secrets and the post-build checks it enforces are documented under [Build an APK without EAS](#build-an-apk-without-eas).
 
 ---
 
 ## Project Structure
 
+Only the parts you need to navigate: full file lists live in the directories themselves.
+
 ```text
 MacroMax/
-├── .github/
-│   └── workflows/
-│       ├── build-apk.yml              # APK/AAB pipeline: prebuild → Gradle → verify → artifact (no EAS)
-│       └── ci.yml                     # CI pipeline (lint → typecheck → test → bundle smoke check)
-├── app/                               # Expo Router screens
-│   ├── (tabs)/
-│   │   ├── _layout.tsx                # Bottom tab bar layout & navigation
-│   │   ├── index.tsx                  # Today's Overview dashboard & goal rings
-│   │   ├── log.tsx                    # Daily Log (Breakfast, Lunch, Dinner, Snacks)
-│   │   ├── recipe.tsx                 # Custom Dish builder & saved batches
-│   │   ├── analytics.tsx              # Analytics dashboard, trends & macro-split donut
-│   │   └── settings.tsx               # Profile & daily goal targets settings
-│   ├── _layout.tsx                    # Root layout, theme provider & onboarding guard
-│   ├── login.tsx                      # 3-step walkthrough & onboarding
-│   ├── scanner.tsx                    # Barcode scanner screen (camera)
-│   └── search.tsx                     # Food search screen with sliding bottom sheet
-├── assets/                            # Static media & bundled databases
-│   ├── favicon.png                    # Web/app favicon
-│   ├── macromax_A_ring_1024.png       # Canonical app logo (1024x1024)
-│   ├── SC1.jpeg                       # Screenshot: Today's Overview
-│   ├── SC2.jpeg                       # Screenshot: Analytics Dashboard
-│   ├── SC3.jpeg                       # Screenshot: Custom Dish Builder
-│   ├── SC5.jpeg                       # Screenshot: Daily Log
-│   ├── SC6.jpeg                       # Screenshot: Profile & Settings
-│   └── seed.db                        # Bundled Tier-1 FTS5 SQLite ingredient database
-├── components/                        # Reusable UI components
-│   ├── AddFoodSheet.tsx               # Add food sliding sheet modal
-│   ├── AppHeader.tsx                  # Header with time-aware greeting & sync pill
-│   ├── BarcodeScannerModal.tsx        # Camera barcode scanner modal
-│   ├── DynamicGreeting.tsx            # Hour-calibrated greeting banner
-│   ├── IngredientResultsSheet.tsx     # Custom dish ingredient picker
-│   ├── LimitAlertCard.tsx             # Fat limit and dietary alerts
-│   ├── LowIntakeAlertCard.tsx         # Time-gated low-intake nudges
-│   ├── MacroCard.tsx                  # Macro stat overview cards
-│   ├── MacroDonut.tsx                 # Hand-rolled SVG macro-split donut chart
-│   ├── MacroProgressBar.tsx           # Linear macro progress bar
-│   ├── MacroRing.tsx                  # Animated UI-thread circular progress ring
-│   ├── MealSlot.tsx                   # Meal item container with delete & edit
-│   ├── MealTargetSheet.tsx            # Meal goal configuration sheet
-│   ├── RequireAuth.tsx                # Onboarding completion check wrapper
-│   ├── ScrollableTabBar.tsx           # Custom gradient bottom tab bar
-│   ├── SearchBar.tsx                  # Debounced food search input
-│   ├── ServingInput.tsx               # Serving quantity & unit selector
-│   └── WeekStrip.tsx                  # Weekly day-selector strip with indicator dots
-├── scripts/                           # Build & generation utilities
-│   ├── build-db.js                    # Rebuilds assets/seed.db from CSV datasets
-│   ├── generate-android-icons.js      # Generates Android adaptive launcher icons
-│   └── inputs/                        # Raw nutritional datasets (IFCT 2017 & USDA)
-│       ├── foundation_food (2).csv
-│       ├── foundation_food_nutrient.csv
-│       ├── ifct2017_compositions.csv
-│       ├── sr_food.csv
-│       └── sr_food_nutrient.csv
+├── app/                  # Expo Router screens
+│                         #   (tabs)/ Today · Log · Recipe · Analytics · Settings
+│                         #   login · search · scanner · root and tab layouts
+├── components/           # Reusable UI: cards, rings, donut, sheets, scanner, week strip, tab bar
 ├── src/
-│   ├── hooks/                         # Custom React hooks
-│   │   ├── useAuth.ts                 # User profile & onboarding status
-│   │   ├── useDailyLog.ts             # Day-specific food logging & totals
-│   │   ├── useDebouncedValue.ts       # Debounce utility hook
-│   │   ├── useFoodSearch.ts           # 3-tier food search orchestration
-│   │   ├── useProfile.ts              # Goals, name, & profile state
-│   │   ├── useSyncStatus.ts           # Search source sync status state
-│   │   └── useWeekLoggedDates.ts      # Active logged dates for the weekly strip
-│   ├── lib/                           # Core business logic (pure, unit-tested)
-│   │   ├── api.ts                     # 3-tier search pipeline (local DB, cache, remote)
-│   │   ├── authStore.ts               # In-memory auth/profile store
-│   │   ├── backup.ts                  # JSON file import/export via share sheet
-│   │   ├── backupData.ts              # Backup serialization & hostile-input validation
-│   │   ├── db.ts                      # SQLite database operations & migrations
-│   │   ├── debounce.ts                # Pure debounce function
-│   │   ├── fallbackFoods.ts           # Built-in offline fallback food database
-│   │   ├── fatSecret.ts               # FatSecret Platform API client (OAuth 2.0)
-│   │   ├── foodLabels.ts              # Food item naming & label utilities
-│   │   ├── foodResults.ts             # Search result deduplication & ranking
-│   │   ├── greeting.ts                # Time-of-day greeting calibration
-│   │   ├── http.ts                    # Defensive HTTP & base64 helpers
-│   │   ├── nutrition.ts               # Nutrition calculations, scaling & goal parsing
-│   │   ├── openFoodFacts.ts           # Open Food Facts API client & parser
-│   │   ├── seedDb.ts                  # Bundled seed database queries (FTS5)
-│   │   ├── servingUnits.ts            # Serving unit conversion (grams, units, portions)
-│   │   ├── syncStatus.ts              # Sync status state pub/sub store
-│   │   ├── tabBarLayout.ts            # Tab bar typography & scale metrics
-│   │   ├── trendSeries.ts             # Chart series bucketing & headroom axis math
-│   │   └── walkthrough.ts            # Onboarding walkthrough slide definitions
-│   ├── theme/                         # Design system tokens
-│   │   ├── colors.ts                  # Emerald Ring palette & WCAG-compliant tokens
-│   │   ├── shadows.ts                 # Platform elevation & shadow presets
-│   │   └── typography.ts              # Font families & scale definitions
-│   └── types/                         # Shared TypeScript interfaces
-│       └── index.ts                   # Core data models (FoodItem, DailyLog, etc.)
-├── test/                              # 331 unit tests (Node test runner + tsx)
-│   ├── api.test.ts                    # 3-tier search pipeline tests
-│   ├── appConfig.test.ts              # ARM ABI policy + R8/release-shrinking guards
-│   ├── backupData.test.ts             # Backup sanitization & round-trip tests
-│   ├── debounce.test.ts               # Debounce timing tests
-│   ├── fallbackFoods.test.ts          # Offline fallback food database tests
-│   ├── fatSecret.test.ts              # FatSecret mapping & regex parsing tests
-│   ├── greeting.test.ts               # Greeting bucket & boundary flip tests
-│   ├── http.test.ts                   # HTTP helpers & base64 encoding tests
-│   ├── nutrition.test.ts              # Nutrition math, goal parsing & macro tests
-│   ├── openFoodFacts.test.ts          # Open Food Facts mapping & kJ conversion tests
-│   ├── ringColors.test.ts             # Progress ring palette separation tests
-│   ├── servingUnits.test.ts           # Serving units & portion conversion tests
-│   ├── syncStatus.test.ts             # Sync status store & mode resolution tests
-│   ├── tabBarLayout.test.ts           # Tab bar metrics & label fit tests
-│   ├── themeContrast.test.ts          # WCAG contrast ratio compliance tests
-│   └── trendSeries.test.ts            # Chart trend series & headroom ceiling tests
-├── plugins/
-│   └── android-proguard-rules.pro     # R8 keeps appended to the generated release build
-├── .gitattributes                     # Binary file attributes
-├── .gitignore                         # Git ignore rules
-├── app.config.js                      # Dynamic Expo config (ARM ABIs, R8, resource shrinking)
-├── app.json                           # Expo app configuration
-├── babel.config.js                    # Babel config (NativeWind)
-├── eas.json                           # Expo Application Services configuration
-├── eslint.config.mjs                  # ESLint 9 configuration (eslint-config-expo)
-├── global.css                         # Tailwind/NativeWind global stylesheets
-├── global.d.ts                        # Global CSS module declarations
-├── metro.config.js                    # Metro bundler configuration
-├── nativewind-env.d.ts                # NativeWind type definitions
-├── package.json                       # Project dependencies & scripts
-├── tailwind.config.js                 # Tailwind CSS configuration
-└── tsconfig.json                      # Strict TypeScript compiler options
+│   ├── hooks/            # useDailyLog · useFoodSearch · useProfile · useAuth · useSyncStatus · …
+│   ├── lib/              # Pure, unit-tested core
+│   │                     #   db · nutrition · api (3-tier search) · seedDb · servingUnits
+│   │                     #   fatSecret · openFoodFacts · fallbackFoods · foodResults
+│   │                     #   backup · backupData · greeting · trendSeries · debounce · http
+│   ├── theme/            # Emerald Ring tokens: colors · shadows · typography
+│   └── types/            # Shared models (FoodItem, DailyLog, …)
+├── assets/               # Logo, favicon, screenshots, bundled seed.db (Tier-1 FTS5 foods)
+├── scripts/              # build-db.js (rebuild seed.db) · generate-android-icons.js (+ inputs/ CSVs)
+├── test/                 # 331 unit tests (Node test runner + tsx)
+├── plugins/              # android-proguard-rules.pro — the R8 keeps for release builds
+├── .github/workflows/    # ci.yml (gates) · build-apk.yml (APK/AAB, no EAS)
+├── app.config.js         # Dynamic Expo config: R8, resource shrinking, ARM ABIs, minSdk
+├── app.json              # Static Expo app config: icons, plugins, permissions
+├── eas.json              # EAS profiles (optional — the GitHub pipeline does not use them)
+└── config at the root    # package.json · tsconfig · eslint · babel · metro · tailwind/NativeWind
 ```
