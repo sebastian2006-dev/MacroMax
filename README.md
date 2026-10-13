@@ -5,6 +5,7 @@
 # MacroMax
 
 [![CI](https://github.com/sebastian2006-dev/MacroMax/actions/workflows/ci.yml/badge.svg)](https://github.com/sebastian2006-dev/MacroMax/actions/workflows/ci.yml)
+[![Website](https://img.shields.io/badge/website-macromaxweb.vercel.app-000000?logo=vercel&logoColor=white)](https://macromaxweb.vercel.app/)
 
 **An offline-first macro & nutrition tracker for Android.**
 
