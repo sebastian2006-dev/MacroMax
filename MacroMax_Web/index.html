@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="emerald">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MacroMax — Calorie and protein tracker for Android</title>
+  <meta name="description"
+    content="MacroMax tracks calories and protein on Android. 8,379 foods built in, instant search, everything stored on your phone, no account needed.">
+  <link rel="icon" type="image/png" href="assets/favicon.png">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet">
+
+  <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+  <!-- Animated background -->
+  <div class="bg" aria-hidden="true">
+    <div class="bg-orb orb-a"></div>
+    <div class="bg-orb orb-b"></div>
+    <div class="bg-orb orb-c"></div>
+    <svg class="bg-rings" viewBox="0 0 800 800" fill="none">
+      <g class="ring-spin ring-spin-1">
+        <circle cx="400" cy="400" r="330" stroke-width="26" pathLength="100" stroke-dasharray="64 36"
+          stroke-linecap="round" />
+      </g>
+      <g class="ring-spin ring-spin-2">
+        <circle cx="400" cy="400" r="270" stroke-width="22" pathLength="100" stroke-dasharray="42 58"
+          stroke-linecap="round" />
+      </g>
+      <g class="ring-spin ring-spin-3">
+        <circle cx="400" cy="400" r="215" stroke-width="2" pathLength="100" stroke-dasharray="1 3" />
+      </g>
+    </svg>
+    <div class="bg-grain"></div>
+  </div>
+
+  <header class="glass-navbar">
+    <div class="nav-container">
+      <a href="#top" class="brand-link" aria-label="MacroMax home">
+        <img src="assets/macromax_A_ring_1024.png" alt="" class="brand-logo" width="36" height="36">
+        <span class="brand-title">MacroMax</span>
+      </a>
+
+      <nav class="nav-links" id="navLinks" aria-label="Sections">
+        <span class="nav-pill" aria-hidden="true"></span>
+        <a href="#demo" class="nav-link">Demo</a>
+        <a href="#rings" class="nav-link">Rings</a>
+        <a href="#screens" class="nav-link">Screens</a>
+        <a href="#features" class="nav-link">Features</a>
+        <a href="#download" class="nav-link nav-cta">Get the APK</a>
+      </nav>
+
+      <div class="nav-actions">
+        <div class="theme-toggle-switch" id="themeSelector" role="group" aria-label="Theme">
+          <button type="button" class="theme-toggle-btn active" data-theme-val="emerald" title="Dark theme"
+            aria-label="Dark theme">
+            <span class="theme-dot emerald"></span><span class="theme-label">Dark</span>
+          </button>
+          <button type="button" class="theme-toggle-btn" data-theme-val="arctic" title="Light theme"
+            aria-label="Light theme">
+            <span class="theme-dot arctic"></span><span class="theme-label">Light</span>
+          </button>
+        </div>
+
+        <a href="https://github.com/sebastian2006-dev/MacroMax" target="_blank" rel="noopener noreferrer"
+          class="nav-github-btn" aria-label="MacroMax on GitHub">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <path
+              d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
+          </svg>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main id="top">
+    <!-- HERO -->
+    <section class="hero-section">
+      <div class="hero-content">
+        <h1 class="hero-title" data-in style="--d:0">Log what you eat. See your calories and protein at a glance.</h1>
+
+        <p class="hero-subtitle" data-in style="--d:1">
+          MacroMax is an Android tracker with 8,379 foods built in. Search is instant, your data stays on your phone,
+          and there is no account or subscription.
+        </p>
+
+        <div class="hero-cta-group" data-in style="--d:2">
+          <a href="#download" class="btn btn-primary">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            <span>Download APK</span>
+          </a>
+          <a href="#demo" class="btn btn-glass">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="5 3 19 12 5 21 5 3" />
+            </svg>
+            <span>Watch the demo</span>
+          </a>
+        </div>
+
+        <dl class="hero-specs" data-in style="--d:3">
+          <div class="spec-item">
+            <dt>Foods built in</dt>
+            <dd data-count="8379">8,379</dd>
+          </div>
+          <div class="spec-item">
+            <dt>Search time</dt>
+            <dd>&lt;3 ms</dd>
+          </div>
+          <div class="spec-item">
+            <dt>Accounts needed</dt>
+            <dd>0</dd>
+          </div>
+          <div class="spec-item">
+            <dt>App size</dt>
+            <dd>~34 MB</dd>
+          </div>
+        </dl>
+      </div>
+
+      <div class="hero-visual" data-in style="--d:2">
+        <div class="phone-stage" id="phoneStage">
+          <div class="phone-frame hero-phone" id="heroPhone">
+            <div class="phone-notch"></div>
+            <div class="phone-screen-container">
+              <img src="assets/SC1.jpeg" alt="MacroMax today screen with calorie and protein rings"
+                class="phone-screen-img" loading="eager">
+            </div>
+            <div class="phone-glass-gloss"></div>
+          </div>
+
+          <div class="floating-chip chip-top-left glass-card">
+            <div class="chip-icon energy-icon">⚡</div>
+            <div class="chip-text">
+              <span class="chip-sub">Calories today</span>
+              <span class="chip-main">2,140 / 2,400 kcal</span>
+            </div>
+          </div>
+
+          <div class="floating-chip chip-bottom-right glass-card">
+            <div class="chip-icon protein-icon">🍗</div>
+            <div class="chip-text">
+              <span class="chip-sub">Protein</span>
+              <span class="chip-main">164 / 180 g</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIDEO -->
+    <section class="video-spotlight-section" id="demo">
+      <div class="section-header">
+        <h2 class="section-title">See it in use</h2>
+        <p class="section-subtitle">Logging meals, checking the rings, and locking the day.</p>
+      </div>
+
+      <div class="cinema-card glass-panel spot">
+        <div class="cinema-video-wrapper" id="cinemaVideoWrapper">
+          <video id="spotlightVideo" class="cinema-video" autoplay loop muted playsinline poster="assets/SC1.jpeg">
+            <source src="video/brag.mp4" type="video/mp4">
+          </video>
+          <div class="cinema-glass-overlay"></div>
+
+          <button type="button" class="cinema-center-pause-badge glass-card" id="cinemaCenterPauseBadge"
+            aria-label="Pause or play video">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+              <rect x="6" y="4" width="4" height="16" />
+              <rect x="14" y="4" width="4" height="16" />
+            </svg>
+            <span>Pause</span>
+          </button>
+
+          <div class="cinema-controls-bar glass-card" id="cinemaControlsBar">
+            <button type="button" class="cinema-ctrl-btn" id="cinemaPlayBtn" aria-label="Pause or play video">
+              <svg id="cinemaPlayIcon" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                <rect x="6" y="4" width="4" height="16" />
+                <rect x="14" y="4" width="4" height="16" />
+              </svg>
+            </button>
+            <button type="button" class="cinema-ctrl-btn" id="cinemaMuteBtn" aria-label="Mute or unmute video">
+              <svg id="cinemaMuteIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                <line x1="23" y1="9" x2="17" y2="15" />
+                <line x1="17" y1="9" x2="23" y2="15" />
+              </svg>
+            </button>
+            <div class="cinema-progress-track" id="cinemaProgressTrack" role="slider" aria-label="Video position"
+              aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" tabindex="0">
+              <div class="cinema-progress-fill" id="cinemaProgressFill"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RING SIMULATOR -->
+    <section class="simulator-section" id="rings">
+      <div class="section-header">
+        <h2 class="section-title">Two goals, two rings</h2>
+        <p class="section-subtitle">Calories and protein each get their own ring. Drag the sliders to see how a day adds
+          up against a 2,500 kcal and 180 g goal.</p>
+      </div>
+
+      <div class="simulator-card glass-panel spot">
+        <div class="simulator-visual">
+          <div class="rings-pair">
+            <div class="ring-display-wrapper">
+              <svg class="macro-svg" viewBox="0 0 240 240" aria-hidden="true">
+                <defs>
+                  <linearGradient id="calorieGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="var(--accent-primary)" />
+                    <stop offset="100%" stop-color="var(--accent-glow)" />
+                  </linearGradient>
+                  <linearGradient id="proteinGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="var(--accent-secondary)" />
+                    <stop offset="100%" stop-color="#38bdf8" />
+                  </linearGradient>
+                </defs>
+                <circle class="ring-track" cx="120" cy="120" r="100" stroke-width="18" />
+                <circle class="ring-progress ring-calories" id="simCalorieRing" cx="120" cy="120" r="100"
+                  stroke-width="18" stroke="url(#calorieGrad)" stroke-linecap="round" />
+              </svg>
+              <div class="ring-center-info">
+                <span class="ring-center-status" id="simRemainingStatus">On track</span>
+                <span class="ring-center-calories" id="simDisplayKcal">2,150</span>
+                <span class="ring-center-unit">kcal logged</span>
+              </div>
+            </div>
+
+            <div class="ring-display-wrapper">
+              <svg class="macro-svg" viewBox="0 0 240 240" aria-hidden="true">
+                <circle class="ring-track" cx="120" cy="120" r="100" stroke-width="18" />
+                <circle class="ring-progress ring-protein" id="simProteinRing" cx="120" cy="120" r="100"
+                  stroke-width="18" stroke="url(#proteinGrad)" stroke-linecap="round" />
+              </svg>
+              <div class="ring-center-info">
+                <span class="ring-center-calories ring-center-protein-val" id="simDisplayProt">145</span>
+                <span class="ring-center-unit">g protein logged</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="simulator-controls">
+          <div class="control-group">
+            <div class="control-header">
+              <label for="sliderCalories">Calories logged</label>
+              <span class="control-val"><span id="valCalories">2,150</span> / 2,500 kcal</span>
+            </div>
+            <input type="range" id="sliderCalories" min="200" max="3200" value="2150" step="25"
+              class="custom-range range-calories">
+          </div>
+
+          <div class="control-group">
+            <div class="control-header">
+              <label for="sliderProtein">Protein logged</label>
+              <span class="control-val"><span id="valProtein">145</span> / 180 g</span>
+            </div>
+            <input type="range" id="sliderProtein" min="10" max="240" value="145" step="1"
+              class="custom-range range-protein">
+          </div>
+
+          <div class="simulator-pills">
+            <div class="sim-pill"><span class="pill-dot dot-cal"></span><span id="simCalPercent">86% of calorie
+                goal</span></div>
+            <div class="sim-pill"><span class="pill-dot dot-prot"></span><span id="simProtPercent">81% of protein
+                goal</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SCREENSHOTS -->
+    <section class="showcase-section" id="screens">
+      <div class="section-header">
+        <h2 class="section-title">Inside the app</h2>
+        <p class="section-subtitle">Tap any screen to see it full size.</p>
+      </div>
+
+      <div class="scroller-viewport" id="scrollerViewport" aria-label="App screenshots">
+        <div class="scroller-track" id="scrollerTrack">
+          <article class="showcase-card glass-panel spot" data-img="assets/SC1.jpeg" data-title="Today"
+            data-desc="Calorie and protein rings for the day, a weekly strip to jump between days, and a nudge when your intake is running low.">
+            <div class="phone-frame mini-phone">
+              <div class="phone-notch"></div>
+              <img src="assets/SC1.jpeg" alt="Today screen" loading="lazy" draggable="false">
+            </div>
+            <div class="showcase-card-info">
+              <h3 class="card-screen-title">Today</h3>
+              <p class="card-screen-desc">Both rings, a weekly strip, and a low-intake nudge.</p>
+            </div>
+          </article>
+
+          <article class="showcase-card glass-panel spot" data-img="assets/SC5.jpeg" data-title="Meal log"
+            data-desc="Meals are grouped into breakfast, lunch, dinner and snacks. Adjust serving sizes, edit an entry, or lock the day so totals stop changing.">
+            <div class="phone-frame mini-phone">
+              <div class="phone-notch"></div>
+              <img src="assets/SC5.jpeg" alt="Meal log screen" loading="lazy" draggable="false">
+            </div>
+            <div class="showcase-card-info">
+              <h3 class="card-screen-title">Meal log</h3>
+              <p class="card-screen-desc">Serving-aware portions, quick edits, one-tap day lock.</p>
+            </div>
+          </article>
+
+          <article class="showcase-card glass-panel spot" data-img="assets/SC3.jpeg" data-title="Dish builder"
+            data-desc="Combine ingredients, set the weight of each, and MacroMax adds up calories, protein, carbs and fat. Save the dish to log it again in one tap.">
+            <div class="phone-frame mini-phone">
+              <div class="phone-notch"></div>
+              <img src="assets/SC3.jpeg" alt="Dish builder screen" loading="lazy" draggable="false">
+            </div>
+            <div class="showcase-card-info">
+              <h3 class="card-screen-title">Dish builder</h3>
+              <p class="card-screen-desc">Pick ingredients, set weights, save the dish for reuse.</p>
+            </div>
+          </article>
+
+          <article class="showcase-card glass-panel spot" data-img="assets/SC2.jpeg" data-title="Analytics"
+            data-desc="Trend charts that scale to your numbers, a macro split for the period you pick, and a rolling 7-day average.">
+            <div class="phone-frame mini-phone">
+              <div class="phone-notch"></div>
+              <img src="assets/SC2.jpeg" alt="Analytics screen" loading="lazy" draggable="false">
+            </div>
+            <div class="showcase-card-info">
+              <h3 class="card-screen-title">Analytics</h3>
+              <p class="card-screen-desc">Trend charts, macro split, and a rolling 7-day average.</p>
+            </div>
+          </article>
+
+          <article class="showcase-card glass-panel spot" data-img="assets/SC6.jpeg" data-title="Profile and backup"
+            data-desc="Set your calorie and macro targets. Export everything as JSON through the Android share sheet and restore it on any device.">
+            <div class="phone-frame mini-phone">
+              <div class="phone-notch"></div>
+              <img src="assets/SC6.jpeg" alt="Profile and backup screen" loading="lazy" draggable="false">
+            </div>
+            <div class="showcase-card-info">
+              <h3 class="card-screen-title">Profile and backup</h3>
+              <p class="card-screen-desc">Set targets, export to JSON, restore on a new phone.</p>
+            </div>
+          </article>
+        </div>
+      </div>
+
+      <div class="scroller-controls-row">
+        <button type="button" class="scroller-arrow-btn" id="scrollerPrevBtn" aria-label="Previous screens">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+            stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+        </button>
+        <button type="button" class="scroller-arrow-btn" id="scrollerNextBtn" aria-label="Next screens">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+            stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </button>
+      </div>
+    </section>
+
+    <!-- FEATURES -->
+    <section class="features-section" id="features">
+      <div class="section-header">
+        <h2 class="section-title">Your data stays on your phone</h2>
+        <p class="section-subtitle">No sign-up, no subscription, no ads, no analytics.</p>
+      </div>
+
+      <div class="bento-grid">
+        <div class="bento-card glass-panel spot span-2">
+          <div class="bento-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <ellipse cx="12" cy="5" rx="9" ry="3" />
+              <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
+              <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
+            </svg>
+          </div>
+          <h3 class="bento-title">Works fully offline</h3>
+          <p class="bento-desc">
+            Your logs, goals and saved dishes live in one local SQLite file (<code>macromax.db</code>). Logging, search
+            and charts all work without a connection, and your history survives app updates.
+          </p>
+          <div class="bento-metric-row">
+            <div class="metric-chip">No account</div>
+            <div class="metric-chip">No analytics</div>
+            <div class="metric-chip">Survives updates</div>
+          </div>
+        </div>
+
+        <div class="bento-card glass-panel spot">
+          <div class="bento-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+          </div>
+          <h3 class="bento-title">8,379 foods ready to log</h3>
+          <p class="bento-desc">
+            Indian (IFCT 2017) and USDA foods are bundled and searched on-device in under 3 ms. Anything missing is
+            looked up online and cached for next time.
+          </p>
+        </div>
+
+        <div class="bento-card glass-panel spot">
+          <div class="bento-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+          </div>
+          <h3 class="bento-title">Lock and save the day</h3>
+          <p class="bento-desc">
+            Once a day is reviewed, lock it. Entries can't be changed by accident, so your 7-day averages stay accurate.
+          </p>
+        </div>
+
+        <div class="bento-card glass-panel spot span-2">
+          <div class="bento-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+              <polyline points="16 6 12 2 8 6" />
+              <line x1="12" y1="2" x2="12" y2="15" />
+            </svg>
+          </div>
+          <h3 class="bento-title">Export and restore with JSON</h3>
+          <p class="bento-desc">
+            Export your full history as readable JSON through the Android share sheet. Restore it on a new device and
+            MacroMax checks the file before importing.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- STACK -->
+    <section class="architecture-section" id="architecture">
+      <div class="section-header">
+        <h2 class="section-title">How it's built</h2>
+        <p class="section-subtitle">React Native on Expo SDK 57, strict TypeScript, and 314 automated tests.</p>
+      </div>
+
+      <div class="arch-container glass-panel spot">
+        <div class="tech-pill-grid">
+          <div class="tech-pill"><span class="tech-title">React Native 0.86</span><span class="tech-sub">Expo SDK
+              57</span></div>
+          <div class="tech-pill"><span class="tech-title">TypeScript</span><span class="tech-sub">Strict mode</span>
+          </div>
+          <div class="tech-pill"><span class="tech-title">expo-sqlite</span><span class="tech-sub">FTS5 search</span>
+          </div>
+          <div class="tech-pill"><span class="tech-title">NativeWind</span><span class="tech-sub">Tailwind CSS</span>
+          </div>
+          <div class="tech-pill"><span class="tech-title">Reanimated</span><span class="tech-sub">UI-thread
+              animation</span></div>
+          <div class="tech-pill"><span class="tech-title">314 tests</span><span class="tech-sub">All passing</span>
+          </div>
+        </div>
+
+        <h3 class="pipeline-title">How a food search is answered</h3>
+        <ol class="pipeline-flow">
+          <li class="pipeline-step">
+            <span class="step-num">1</span>
+            <span class="step-name">Bundled database</span>
+            <span class="step-desc">8,379 Indian and USDA foods, searched on-device</span>
+          </li>
+          <li class="pipeline-step">
+            <span class="step-num">2</span>
+            <span class="step-name">Device cache</span>
+            <span class="step-desc">Foods you've looked up before, replayed instantly</span>
+          </li>
+          <li class="pipeline-step">
+            <span class="step-num">3</span>
+            <span class="step-name">Online lookup</span>
+            <span class="step-desc">FatSecret and Open Food Facts, only when needed</span>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- DOWNLOAD -->
+    <section class="download-section" id="download">
+      <div class="section-header">
+        <h2 class="section-title">Download MacroMax</h2>
+        <p class="section-subtitle">Free, open source, and installs directly on Android 8.0 or newer.</p>
+      </div>
+
+      <div class="download-hub-card glass-panel spot">
+        <div class="tab-header" id="tabHeader" role="tablist" aria-label="Download options" style="--i:0">
+          <button class="tab-btn active" data-tab="universal" role="tab" aria-selected="true" id="tab-btn-universal">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            <span>APK</span>
+          </button>
+          <button class="tab-btn" data-tab="install" role="tab" aria-selected="false" id="tab-btn-install">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="5" y="2" width="14" height="20" rx="2" />
+              <line x1="12" y1="18" x2="12.01" y2="18" />
+            </svg>
+            <span>Install</span>
+          </button>
+          <button class="tab-btn" data-tab="source" role="tab" aria-selected="false" id="tab-btn-source">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="16 18 22 12 16 6" />
+              <polyline points="8 6 2 12 8 18" />
+            </svg>
+            <span>Build from source</span>
+          </button>
+        </div>
+
+        <div class="tab-pane active" id="pane-universal" role="tabpanel" aria-labelledby="tab-btn-universal">
+          <div class="apk-download-box">
+            <div class="apk-meta-header">
+              <div class="apk-badge-icon"><img src="assets/macromax_A_ring_1024.png" alt="" width="52" height="52">
+              </div>
+              <div class="apk-meta-info">
+                <h3 class="apk-name">MacroMax v1.0.0</h3>
+                <div class="apk-tags">
+                  <span class="tag-pill">Android 8.0+</span>
+                  <span class="tag-pill">~34 MB</span>
+                  <span class="tag-pill">Universal APK</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="apk-cta-row">
+              <a href="https://github.com/sebastian2006-dev/MacroMax/releases/latest" id="directApkBtn"
+                class="btn btn-primary btn-large">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                <span>Download from GitHub</span>
+              </a>
+            </div>
+
+            <div class="checksum-container glass-card">
+              <div class="checksum-label">SHA-256</div>
+              <code class="checksum-code"
+                id="checksumText">e8b7c4d81f2a3390c88502f9e4210e7b99c1a0e74f2619cb24074213d297ff01</code>
+              <button type="button" class="btn-copy" id="copyChecksumBtn" aria-label="Copy SHA-256 checksum">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                </svg>
+                <span class="copy-status">Copy</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-pane" id="pane-install" role="tabpanel" aria-labelledby="tab-btn-install" hidden>
+          <ol class="guide-steps-grid">
+            <li class="guide-step glass-card">
+              <span class="guide-step-num">1</span>
+              <h4>Download the APK</h4>
+              <p>Open this page on your Android phone and tap Download from GitHub.</p>
+            </li>
+            <li class="guide-step glass-card">
+              <span class="guide-step-num">2</span>
+              <h4>Allow the install</h4>
+              <p>When Android asks, open Settings and allow installs from your browser.</p>
+            </li>
+            <li class="guide-step glass-card">
+              <span class="guide-step-num">3</span>
+              <h4>Open MacroMax</h4>
+              <p>Tap Install, open the app, and set your goals. No sign-in needed.</p>
+            </li>
+          </ol>
+        </div>
+
+        <div class="tab-pane" id="pane-source" role="tabpanel" aria-labelledby="tab-btn-source" hidden>
+          <div class="source-code-box glass-card">
+            <h4>Build it yourself</h4>
+            <p>MacroMax is MIT licensed. Clone the repository and build a release APK with Expo and Gradle.</p>
+            <div class="terminal-block">
+              <div class="terminal-bar"><span class="term-dot"></span><span class="term-dot"></span><span
+                  class="term-dot"></span><span class="term-title">bash</span></div>
+              <pre><code><span class="c-comment"># Clone the repository</span>
+git clone https://github.com/sebastian2006-dev/MacroMax.git
+cd MacroMax
+
+<span class="c-comment"># Install dependencies and set up env</span>
+npm install
+cp .env.example .env
+
+<span class="c-comment"># Build the release APK</span>
+npx expo prebuild
+cd android &amp;&amp; ./gradlew assembleRelease</code></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- LIGHTBOX -->
+  <div class="lightbox-modal" id="lightboxModal" role="dialog" aria-modal="true" aria-label="Screenshot preview"
+    aria-hidden="true">
+    <div class="lightbox-overlay" id="lightboxOverlay"></div>
+    <div class="lightbox-dialog glass-panel">
+      <button class="lightbox-close" id="lightboxClose" aria-label="Close preview">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18" />
+          <line x1="6" y1="6" x2="18" y2="18" />
+        </svg>
+      </button>
+
+      <div class="lightbox-content">
+        <div class="lightbox-image-wrap"><img src="" alt="" id="lightboxImg"></div>
+        <div class="lightbox-caption-wrap">
+          <h3 class="lightbox-title" id="lightboxTitle"></h3>
+          <p class="lightbox-desc" id="lightboxDesc"></p>
+          <div class="lightbox-nav-buttons">
+            <button class="btn btn-glass btn-sm" id="lightboxPrev">Previous</button>
+            <button class="btn btn-glass btn-sm" id="lightboxNext">Next</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="glass-footer">
+    <div class="footer-container">
+      <div class="footer-brand">
+        <div class="footer-logo-row">
+          <img src="assets/macromax_A_ring_1024.png" alt="" width="28" height="28">
+          <span class="footer-title">MacroMax</span>
+        </div>
+        <p class="footer-tagline">Calorie and protein tracker for Android.</p>
+      </div>
+
+      <div class="footer-links">
+        <a href="https://github.com/sebastian2006-dev/MacroMax" target="_blank" rel="noopener noreferrer">GitHub</a>
+        <a href="https://github.com/sebastian2006-dev/MacroMax/blob/main/LICENSE" target="_blank"
+          rel="noopener noreferrer">MIT License</a>
+        <a href="https://github.com/sebastian2006-dev/MacroMax/issues" target="_blank" rel="noopener noreferrer">Report
+          an issue</a>
+      </div>
+
+      <div class="footer-copy">
+        Made by <a href="https://github.com/sebastian2006-dev" target="_blank"
+          rel="noopener noreferrer">@sebastian2006-dev</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+
+</html>
