@@ -1,6 +1,6 @@
 Apache License, Version 2.0 with Commons Clause Condition v1.0
 
-Copyright [Year] [Your Name/Organization]
+Copyright [2026] [Sebastian Kappen]
 
 "Commons Clause" License Condition v1.0
 
