@@ -19,6 +19,7 @@
     "@expo/vector-icons": "^15.0.2",
     "expo": "~57.0.25",
     "expo-asset": "~57.0.17",
+    "expo-build-properties": "~57.0.22",
     "expo-camera": "~57.0.5",
     "expo-constants": "~57.0.18",
     "expo-document-picker": "~57.0.2",

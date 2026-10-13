@@ -26,6 +26,10 @@ export default tseslint.config(
       // under plain node, not the app bundler — RN/browser globals rules and
       // ESM assumptions don't apply to them.
       "scripts/**",
+      // app.config.js is the Node-side Expo config (CommonJS, standard Node
+      // globals like __dirname); it is evaluated by the Expo CLI at build
+      // time, never bundled into the app.
+      "app.config.js",
       "brag-output/**",
     ],
   },

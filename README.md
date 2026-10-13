@@ -14,7 +14,7 @@ Built natively with React Native (Expo SDK 57), TypeScript strict mode and Nativ
 ![Platform](https://img.shields.io/badge/platform-Android-3DDC84?logo=android&logoColor=white)
 ![Expo](https://img.shields.io/badge/Expo-SDK%2057-000020?logo=expo&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-314%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-331%20passing-brightgreen)
 ![Storage](https://img.shields.io/badge/storage-SQLite%20only-003B57?logo=sqlite&logoColor=white)
 
 ---
@@ -26,6 +26,8 @@ Built natively with React Native (Expo SDK 57), TypeScript strict mode and Nativ
 - [Architecture](#architecture)
 - [Tech Stack](#tech-stack)
 - [Getting Started](#getting-started)
+- [Android Release Build](#android-release-build)
+- [Build an APK without EAS](#build-an-apk-without-eas)
 - [Environment Variables](#environment-variables)
 - [Data Providers](#data-providers)
 - [Testing](#testing)
@@ -164,7 +166,11 @@ npx expo run:android                # dev client (recommended)
 # release APK:
 npx expo prebuild
 cd android && ./gradlew assembleRelease
+
+# or ask GitHub to do it, without EAS — see "Build an APK without EAS"
 ```
+
+`app.config.js` picks the ABI set from `BUILD_TARGET`: `physical` builds the ARM-only APK real phones need, `emulator` keeps `x86_64` so an AVD can install it, and unset falls back to the EAS profile.
 
 Useful scripts:
 
@@ -173,6 +179,114 @@ npm run build:db      # rebuild assets/seed.db from scripts/inputs CSVs
 npm run build:icons   # regenerate launcher/splash art from the canonical logo
 npm run ci            # lint + typecheck + tests (what CI runs)
 ```
+
+---
+
+## Android Release Build
+
+Release builds are tuned for the phones this app actually runs on — **every ARM Android phone shipped since 2017**. None of it is written into `android/`, which is git-ignored build output; it is declared once in [app.config.js](app.config.js) and re-applied by the Expo CLI on every prebuild (local, CI and EAS alike).
+
+| Setting | Value | What it buys |
+| --- | --- | --- |
+| `minSdkVersion` | `24` (Android 7.0) | Pinned floor: 2017-era devices install, and a future SDK raising the floor fails the config loudly instead of dropping them silently |
+| `enableMinifyInReleaseBuilds` | `true` | Runs **R8** on release builds: strips and obfuscates unreachable Java/Kotlin, shrinks the dex, optimizes the rest |
+| `enableShrinkResourcesInReleaseBuilds` | `true` | Removes `res/` entries nothing reachable references (requires R8 above) |
+| `enablePngCrunchInReleaseBuilds` | `true` | AAPT2 recompresses packaged PNGs |
+| `extraProguardRules` | [plugins/android-proguard-rules.pro](plugins/android-proguard-rules.pro) | The R8 keeps library consumer rules cannot supply |
+| `buildArchs` | ARM-only for `preview`/`production`, all four ABIs otherwise | Ships `arm64-v8a` + `armeabi-v7a` to devices; keeps `x86_64` so x86 AVDs and the dev client still install |
+
+### ARM coverage
+
+| ABI | Role | Devices |
+| --- | --- | --- |
+| `arm64-v8a` | 64-bit ARM — mandatory on Google Play since 2019 | Practically every phone since 2017 (64-bit Snapdragon / Exynos / Kirin / MediaTek SoCs) |
+| `armeabi-v7a` | 32-bit ARM | 2017-2019 budget phones and 32-bit installs of 64-bit chips |
+| `x86`, `x86_64` | Emulator / AVD only | Never part of a store build |
+
+Debug and development builds keep all four ABIs so an `x86_64` AVD (and expo-dev-client) still work. Store builds drop x86 entirely, which is where tens of megabytes of unused Hermes/JSI/Reanimated/Worklets `.so` payload would otherwise sit in every download. The GitHub pipeline below selects the ARM-only set with `BUILD_TARGET=physical`, no EAS profile required.
+
+### R8 specifics
+
+- Reanimated, Worklets and TurboModules are instantiated by name from C++/JS, so [plugins/android-proguard-rules.pro](plugins/android-proguard-rules.pro) keeps those entry points plus the source-file/line-table attributes the Play Console needs to de-minify a trace. Everything else is left to the libraries' own consumer rules (React Native, Expo Modules, expo-updates, react-native-svg and Reanimated all ship them), so R8 stays free to delete what nothing references.
+- **Crash reports are only readable with the mapping file** — keep `android/app/build/outputs/mapping/release/mapping.txt` (or the mapping artifact) from every release build; without it a Play Console trace is obfuscated names.
+- A prebuild regenerates `android/`, so re-run `npm run build:icons` afterwards — the launcher/boot-splash artwork and the hand-tuned splash theme are not expressible in `app.json`.
+
+### What the switches actually remove
+
+Measured on this project (release APK, both ARM ABIs, debug-signed, same source):
+
+| Artifact | R8 + resource shrinking | Both off |
+| --- | --- | --- |
+| dex (`classes*.dex`) | 17.8 MiB | 53.9 MiB |
+| `resources.arsc` | 1.43 MiB | 1.66 MiB |
+| Whole APK | **65.8 MiB** | 78.3 MiB |
+
+R8 also leaves a 63 MB mapping file (668k lines) and a `usage.txt` of ~85k removed declarations — that is what makes the settings worth keeping, and why turning them off should be a deliberate decision rather than a silent one.
+
+Check any produced APK:
+
+```bash
+unzip -l android/app/build/outputs/apk/release/app-release.apk | grep "lib/"   # expect arm64-v8a + armeabi-v7a only
+ls android/app/build/outputs/mapping/release/                                   # R8 mapping + seeds
+zipalign -c -P 16 -v 4 android/app/build/outputs/apk/release/app-release.apk    # 16 KB page alignment (Android 15+)
+```
+
+The ARM-only payload is 46.5 MiB of that APK (27.6 MiB `arm64-v8a` + 18.9 MiB `armeabi-v7a`); the page-size check matters because Android 15+ devices can run with 16 KB pages and Play rejects releases whose bundled `.so` files are only 4 KB aligned.
+
+---
+
+## Build an APK without EAS
+
+[.github/workflows/build-apk.yml](.github/workflows/build-apk.yml) builds a release APK — or a Play bundle — **on a GitHub runner, with no Expo account, no EAS quota and no Android SDK on your machine**. Start it from **Actions → Build APK → Run workflow**, or push a tag like `v1.0.0` to build *and* publish a GitHub Release.
+
+Because `android/` is git-ignored build output, the workflow does exactly what you would do by hand:
+
+| # | Step | Why |
+| --- | --- | --- |
+| 1 | `npm ci` | the committed lockfile *is* the build's dependency set |
+| 2 | `expo prebuild --platform android --no-install` | app.json + app.config.js (plugins, R8, ABI set, `minSdkVersion`) → the native project |
+| 3 | `npm run build:icons` | launcher and boot-splash art that `app.json` cannot express |
+| 4 | `./gradlew :app:assembleRelease` | the R8-shrunk, resource-shrunk, ARM-only, signed APK |
+
+Gradle only starts once the run has proved the generated project really carries the release config: it asserts `reactNativeArchitectures`, `android.minSdkVersion=24`, R8, resource shrinking and PNG crunching in `android/gradle.properties`, and that the committed R8 keeps reached `proguard-rules.pro`. A regression in [app.config.js](app.config.js) therefore fails the pipeline instead of quietly shipping a fatter or x86-carrying APK.
+
+### Inputs
+
+| Input | Options | Result |
+| --- | --- | --- |
+| `abis` | `arm-only` *(default)* | `arm64-v8a` + `armeabi-v7a` — what every ARM phone since 2017 has (`BUILD_TARGET=physical`) |
+| | `all-abis` | adds `x86`/`x86_64` so an emulator can install the APK too (`BUILD_TARGET=emulator`) |
+| `artifact` | `apk` *(default)*, `aab`, `both` | installable APK, Play bundle, or both |
+
+### Signing
+
+Out of the box the APK is signed with the debug key the Expo template ships — the same artifact `expo run:android --variant release` produces: **installable on any phone, rejected by Play**. Set all three of `RELEASE_KEYSTORE_BASE64` (base64 of your `.jks`), `RELEASE_KEYSTORE_PASSWORD` and `RELEASE_KEYSTORE_ALIAS` as repository secrets and the run re-signs with your own key instead, then verifies the result.
+
+### Optional provider keys
+
+`EXPO_PUBLIC_FATSECRET_CLIENT_ID`, `EXPO_PUBLIC_FATSECRET_CLIENT_SECRET`, `EXPO_PUBLIC_FATSECRET_REGION` and `EXPO_PUBLIC_OFF_USER_AGENT` are picked up from repository secrets if you define them — see [Environment Variables](#environment-variables). Like a local `.env`, they are compiled *into* the bundle. Leave them unset and the workflow still builds; the app just answers searches from its offline tiers.
+
+### What the run leaves behind
+
+| Artifact | Retention | Contents |
+| --- | --- | --- |
+| `macromax-apk` / `macromax-aab` | 30 days | `MacroMax-<version>-<arm\|all-abis>.apk` / `.aab` |
+| `build-metadata` | 90 days | `BUILD-INFO.txt` (commit, run URL, how it was signed) and the **R8 `mapping.txt`** needed to read any crash trace |
+
+Before uploading, the artifact is verified independently of Gradle: both ARM ABIs present (and no `x86` payload in an `arm-only` build), 16 KB page alignment (`zipalign -c -P 16`, required on Android 15+), a valid signature (`apksigner verify`) and a warning if the APK grows past 90 MiB. The job summary reports the plan plus the ABI list, size and SHA-256.
+
+A first run takes roughly 20-40 minutes — it downloads the NDK and compiles the Reanimated/Worklets C++ for two ABIs from scratch; the npm and Gradle caches make later runs much quicker.
+
+### Cutting a release
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+The tag build runs the same gates and the same build, then attaches the APK, the bundle, `BUILD-INFO.txt` and the R8 mapping to a GitHub Release for that tag.
+
+EAS is untouched by all of this: [eas.json](eas.json) and its profiles still work, and `BUILD_TARGET` is only ever set by this workflow.
 
 ---
 
@@ -204,7 +318,7 @@ The app degrades gracefully without keys: local tiers (seed DB, cache, fallback 
 
 ## Testing
 
-**314 / 314 unit tests passing** plus lint (`--max-warnings 0`) and strict `tsc --noEmit`. Tests exercise the **real modules** — pure logic, no native or network dependencies — so they verify actual app behaviour rather than copies of it.
+**331 / 331 unit tests passing** plus lint (`--max-warnings 0`) and strict `tsc --noEmit`. Tests exercise the **real modules** — pure logic, no native or network dependencies — so they verify actual app behaviour rather than copies of it.
 
 ```bash
 npm test           # run all unit tests
@@ -230,6 +344,7 @@ npm run ci         # everything CI runs
 | Ring palette | 9 | Hue-family + pairwise-separation guards, track = own-color tint, `withAlpha` clamping |
 | Tab-bar layout | 7 | Geometry vs font scale; labels never truncate at 100–300% |
 | Debounce | 6 | Trailing-edge semantics, cancel/flush, burst collapse |
+| Android release config | 17 | R8 / resource-shrinking / PNG-crunch switches, `minSdkVersion` floor, the committed proguard keeps, and the `BUILD_TARGET` ABI override the APK pipeline uses |
 
 ---
 
@@ -242,6 +357,8 @@ GitHub Actions (`.github/workflows/ci.yml`) runs on every push to `main`/`featur
 
 The README badge above always reflects the latest `main` run.
 
+Producing the artifacts is a second, intentionally manual workflow — [Build an APK without EAS](#build-an-apk-without-eas) — so a build only ever happens when someone asks for one.
+
 ---
 
 ## Project Structure
@@ -250,6 +367,7 @@ The README badge above always reflects the latest `main` run.
 MacroMax/
 ├── .github/
 │   └── workflows/
+│       ├── build-apk.yml              # APK/AAB pipeline: prebuild → Gradle → verify → artifact (no EAS)
 │       └── ci.yml                     # CI pipeline (lint → typecheck → test → bundle smoke check)
 ├── app/                               # Expo Router screens
 │   ├── (tabs)/
@@ -336,8 +454,9 @@ MacroMax/
 │   │   └── typography.ts              # Font families & scale definitions
 │   └── types/                         # Shared TypeScript interfaces
 │       └── index.ts                   # Core data models (FoodItem, DailyLog, etc.)
-├── test/                              # 314 unit tests (Node test runner + tsx)
+├── test/                              # 331 unit tests (Node test runner + tsx)
 │   ├── api.test.ts                    # 3-tier search pipeline tests
+│   ├── appConfig.test.ts              # ARM ABI policy + R8/release-shrinking guards
 │   ├── backupData.test.ts             # Backup sanitization & round-trip tests
 │   ├── debounce.test.ts               # Debounce timing tests
 │   ├── fallbackFoods.test.ts          # Offline fallback food database tests
@@ -352,8 +471,11 @@ MacroMax/
 │   ├── tabBarLayout.test.ts           # Tab bar metrics & label fit tests
 │   ├── themeContrast.test.ts          # WCAG contrast ratio compliance tests
 │   └── trendSeries.test.ts            # Chart trend series & headroom ceiling tests
+├── plugins/
+│   └── android-proguard-rules.pro     # R8 keeps appended to the generated release build
 ├── .gitattributes                     # Binary file attributes
 ├── .gitignore                         # Git ignore rules
+├── app.config.js                      # Dynamic Expo config (ARM ABIs, R8, resource shrinking)
 ├── app.json                           # Expo app configuration
 ├── babel.config.js                    # Babel config (NativeWind)
 ├── eas.json                           # Expo Application Services configuration
