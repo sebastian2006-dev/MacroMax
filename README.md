@@ -396,3 +396,11 @@ MacroMax/
 ├── eas.json              # EAS profiles (optional — the GitHub pipeline does not use them)
 └── config at the root    # package.json · tsconfig · eslint · babel · metro · tailwind/NativeWind
 ```
+## License
+
+MacroMax is distributed under the **Apache License 2.0 with Commons Clause v1.0**.
+
+- **Personal & Educational Use:** You are free to view, fork, compile, modify, and run MacroMax for your personal use.
+- **Commercial Restriction:** You may not sell MacroMax, distribute paid binaries, package it with ads, or publish monetized builds to app stores (Google Play, Apple App Store, etc.).
+
+For commercial licensing requests, reach out to [EMAIL_ADDRESS].
