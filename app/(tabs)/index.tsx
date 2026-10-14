@@ -6,7 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { RequireAuth } from "@/components/RequireAuth";
 import { AppHeader } from "@/components/AppHeader";
 import { DynamicGreeting } from "@/components/DynamicGreeting";
-import { WeekStrip } from "@/components/WeekStrip";
+import { MonthCalendar } from "@/components/MonthCalendar";
 import { MacroRing } from "@/components/MacroRing";
 import { MacroCard } from "@/components/MacroCard";
 import { LowIntakeAlertCard } from "@/components/LowIntakeAlertCard";
@@ -15,15 +15,14 @@ import { useTabBarClearance } from "@/components/ScrollableTabBar";
 import { useAuth } from "@/src/hooks/useAuth";
 import { useProfile } from "@/src/hooks/useProfile";
 import { useDailyLog } from "@/src/hooks/useDailyLog";
-import { useWeekLoggedDates } from "@/src/hooks/useWeekLoggedDates";
+import { useLoggedDatesInMonth } from "@/src/hooks/useLoggedDatesInMonth";
+import { weekOf } from "@/src/lib/monthGrid";
 import {
-  addDays,
   calculateTotals,
   getGoalTargets,
   getLimitAlerts,
   getLowIntakeAlerts,
   resolveGoalTargets,
-  startOfWeek,
   toLocalDateString,
 } from "@/src/lib/nutrition";
 import { COLORS, RING_COLORS } from "@/src/theme/colors";
@@ -91,12 +90,15 @@ function DashboardContent() {
 
   const todayString = useMemo(() => toLocalDateString(new Date()), []);
 
-  const weekDates = useMemo(() => {
-    const monday = startOfWeek(new Date());
-    return Array.from({ length: 7 }, (_, index) => addDays(monday, index));
-  }, []);
+  // The strip follows the SELECTED day (not "today"), because the expanded
+  // month grid can select any day of the month — a strip pinned to this week
+  // would then highlight nothing. The Today pill jumps the strip back.
+  const weekDates = useMemo(() => weekOf(selectedDate), [selectedDate]);
 
-  const { loggedDates, refresh: refreshLoggedDates } = useWeekLoggedDates(userId, weekDates);
+  const { loggedDates, refresh: refreshLoggedDates } = useLoggedDatesInMonth(
+    userId,
+    selectedDate
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -185,8 +187,11 @@ function DashboardContent() {
           </View>
         ) : null}
 
-        {/* Week strip — shared, uniform-height day chips (see WeekStrip) */}
-        <WeekStrip
+        {/* Week strip + collapsible whole-month view (see MonthCalendar). The
+            expanded grid is laid out in normal flow with fixed pixel rows, so
+            it pushes the rings below it down instead of colliding with them. */}
+        <MonthCalendar
+          anchor={selectedDate}
           weekDates={weekDates}
           selectedDate={selectedDate}
           onSelectDate={setSelectedDate}

@@ -192,6 +192,13 @@ export const USER_PREF_KEYS = {
   onboarding: "has_completed_onboarding",
   /** True once the first-run walkthrough has been watched to the end. */
   walkthrough: "has_seen_walkthrough",
+  /**
+   * JSON blob with the four meal reminders (time, weekdays, one-shot flag,
+   * name). Stored like every other preference: inside macromax.db, so it is
+   * carried by a backup/restore and survives a reinstalled APK's update.
+   * Restoring a backup re-applies the OS-side schedule via the reconcile pass.
+   */
+  mealReminders: "meal_reminders",
 } as const;
 
 /** Upsert against an explicit connection (usable inside open transactions). */

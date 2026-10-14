@@ -14,7 +14,7 @@ Built natively with React Native (Expo SDK 57), TypeScript strict mode and Nativ
 ![Platform](https://img.shields.io/badge/platform-Android-3DDC84?logo=android&logoColor=white)
 ![Expo](https://img.shields.io/badge/Expo-SDK%2057-000020?logo=expo&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-331%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-420%20passing-brightgreen)
 ![Storage](https://img.shields.io/badge/storage-SQLite%20only-003B57?logo=sqlite&logoColor=white)
 
 ---
@@ -73,6 +73,7 @@ Built natively with React Native (Expo SDK 57), TypeScript strict mode and Nativ
 - **Daily Log** for managing meals across Breakfast, Lunch, Dinner and Snacks/Extra, with **Lock & Save Day** — a locked day refuses further edits so reviewed totals can't drift
 - **Custom Dish** builder — name a dish, pick ingredients + servings, save it as a one-tap loggable batch
 - **Weekly strip** with logged-day dots and day-switching; ring animations re-fill per day
+- **Collapsible month calendar** — a dropdown above the strip opens the whole month, where every day shows whether anything was logged (filled dot) or not, with today ringed and the selected day filled. The strip follows your selection, and the panel stretches into the page rather than over it: it is laid out in normal flow with a fixed six-row, whole-pixel grid (see [monthGrid.ts](src/lib/monthGrid.ts)), so expanding it pushes the rings and cards below down and can never overlap them
 - **Time-aware greeting card** — hour-calibrated buckets (morning / midday / afternoon / evening / night) with a rotating phrase per bucket
 
 ### Food search
@@ -88,6 +89,17 @@ Built natively with React Native (Expo SDK 57), TypeScript strict mode and Nativ
 - Swipeable per-macro trend pages (calories / protein / carbs / fats) with **daily and monthly windows**, self-calibrating Y axes (headroom above the peak, never clipped), readable date labels and honest captions
 - Macro-split donut with period totals and per-macro percentages
 - Rolling 7-day averages per metric
+
+### Meal reminders
+
+- **Four alarms, one per meal** — Breakfast, Lunch, Dinner and Snacks/Extra, each with its own time, weekdays and name
+- **Scheduled by Android itself** (`expo-notifications` → `AlarmManager`), so a reminder still pops up when MacroMax is closed, killed or swiped out of Recents; pending reminders are re-armed automatically after a reboot
+- **Ring once or repeat** — pick any set of weekdays (or *Every day*) to repeat, or switch on **Ring once**: it fires at the next occurrence and then turns itself off until you switch it back on, exactly like a one-off alarm
+- **Samsung-style editor** — a snap-scrolling hour/minute/am-pm wheel above a sheet card with the day chips (Sunday in red), an underlined *Alarm name* field and Cancel/Save, restyled into the app's own light Emerald Ring palette
+- **Friendly, not naggy** — the notification carries the reminder's name and a rotating, human line per meal; tapping it opens the Daily Log
+- **Arrives on time** — Android 14+ denies exact alarms by default, so the alarms screen offers a one-tap deep link to *Alarms & reminders* plus a Battery-settings shortcut for OEM power savers. Without that access the reminder still arrives, just possibly a few minutes late
+- **Backed up with everything else** — the reminder config lives in `user_prefs`, so a backup/restore carries it, and the app re-arms the OS schedule on the next launch
+- **Expo Go safe by construction** — importing `expo-notifications` throws on Android inside Expo Go (remote push was removed from it in SDK 53), so the package is never imported statically: [notifications.ts](src/lib/notifications.ts) loads it lazily *behind* an Expo Go guard, the app boots normally there, the alarms screen says a development build is required, and the settings you enter are kept for when you install one
 
 ### Data ownership
 
@@ -107,7 +119,7 @@ Built natively with React Native (Expo SDK 57), TypeScript strict mode and Nativ
 
 ```
 ┌──────────────────────────────  app/ (Expo Router)  ─────────────────────────────┐
-│  (tabs): Today · Log · Recipe · Analytics · Settings      login · search · scan │
+│  (tabs): Today · Log · Recipe · Analytics · Settings   login · search · scan · alarms │
 └──────────────┬──────────────────────────────────────────────────┬──────────────┘
                │ hooks (useAuth, useProfile, useDailyLog, …)       │
 ┌──────────────▼──────────────────────────────────────────────────▼──────────────┐
@@ -138,7 +150,7 @@ Built natively with React Native (Expo SDK 57), TypeScript strict mode and Nativ
 | Storage | **expo-sqlite** (user data + prefs) + bundled FTS5 seed DB |
 | Animation | react-native-reanimated (UI-thread ring fills) |
 | Charts | `react-native-chart-kit` + hand-rolled SVG (rings, donut) |
-| Native integrations | expo-camera, expo-file-system, expo-sharing, expo-document-picker, expo-updates (reload-after-restore) |
+| Native integrations | expo-camera, expo-file-system, expo-sharing, expo-document-picker, expo-updates (reload-after-restore), expo-notifications (scheduled meal reminders), expo-intent-launcher (exact-alarm settings) |
 | Lint / Test | ESLint 9 (eslint-config-expo) · Node built-in test runner via tsx |
 
 ---
@@ -262,6 +274,10 @@ Gradle only starts once the run has proved the generated project really carries 
 
 Out of the box the APK is signed with the debug key the Expo template ships — the same artifact `expo run:android --variant release` produces: **installable on any phone, rejected by Play**. Set all three of `RELEASE_KEYSTORE_BASE64` (base64 of your `.jks`), `RELEASE_KEYSTORE_PASSWORD` and `RELEASE_KEYSTORE_ALIAS` as repository secrets and an `apk`/`both` build re-signs with your own key instead, then verifies the result. An `aab`-only run has no APK to re-sign, so Play needs your own upload key for that path.
 
+### Reminder permissions
+
+The APK requests `SCHEDULE_EXACT_ALARM` (declared in [app.json](app.json)) so meal reminders can land on the minute; the notification permission itself and `RECEIVE_BOOT_COMPLETED` come from the `expo-notifications` manifest. `USE_EXACT_ALARM` is deliberately **not** requested — Android grants it automatically but Play restricts it to clock/calendar apps, and the alarms screen links to the system *Alarms & reminders* switch instead. [notificationConfig.test.ts](test/notificationConfig.test.ts) guards both the permission and the channel id.
+
 ### Optional provider keys
 
 `EXPO_PUBLIC_FATSECRET_CLIENT_ID`, `EXPO_PUBLIC_FATSECRET_CLIENT_SECRET`, `EXPO_PUBLIC_FATSECRET_REGION` and `EXPO_PUBLIC_OFF_USER_AGENT` are picked up from repository secrets if you define them — see [Environment Variables](#environment-variables). Like a local `.env`, they are compiled *into* the bundle. Leave them unset and the build is unaffected: only FatSecret-backed text search goes away (Open Food Facts needs no key and still serves both search and barcode lookups, on top of the bundled database and cache).
@@ -279,12 +295,16 @@ A first run takes roughly 20-40 minutes — it downloads the NDK and compiles th
 
 ### Cutting a release
 
+Two ways, both publishing a GitHub Release with the APK, the bundle, `BUILD-INFO.txt` and the R8 mapping attached:
+
 ```bash
 git tag v1.0.0
-git push origin v1.0.0
+git push origin v1.0.0        # tag push → builds AND publishes
 ```
 
-The tag build runs the same gates and the same build, then attaches the APK, the bundle, `BUILD-INFO.txt` and the R8 mapping to a GitHub Release for that tag.
+or **Actions → Build APK → Run workflow** with *Also publish a GitHub Release* ticked. The manual path uses `release_tag` when you fill it in and `v<app.json version>` otherwise (`1.2.3` is accepted as well as `v1.2.3`), validates it against `v<major>.<minor>.<patch>[-prerelease]`, and cuts the tag at the commit the run actually built (`--target $GITHUB_SHA`) — so a release no longer costs a trip to the Artifacts list. Re-running the same tag updates the existing release instead of failing on it.
+
+> This is why the release job's condition is no longer tag-only: a `workflow_dispatch` run is on a branch, so the old `if: startsWith(github.ref, 'refs/tags/v')` silently skipped it for every hand-triggered build. [releaseWorkflow.test.ts](test/releaseWorkflow.test.ts) now asserts both paths.
 
 EAS is untouched by all of this: [eas.json](eas.json) and its profiles still work, and `BUILD_TARGET` is only ever set by this workflow.
 
@@ -318,7 +338,7 @@ Only FatSecret needs a key. Without the FatSecret pair, text search falls back t
 
 ## Testing
 
-**331 / 331 unit tests passing** plus lint (`--max-warnings 0`) and strict `tsc --noEmit`. Tests exercise the **real modules** — pure logic, no native or network dependencies — so they verify actual app behaviour rather than copies of it.
+**420 / 420 unit tests passing** plus lint (`--max-warnings 0`) and strict `tsc --noEmit`. Tests exercise the **real modules** — pure logic, no native or network dependencies — so they verify actual app behaviour rather than copies of it.
 
 ```bash
 npm test           # run all unit tests
@@ -345,6 +365,10 @@ npm run ci         # everything CI runs
 | Tab-bar layout | 7 | Geometry vs font scale; labels never truncate at 100–300% |
 | Debounce | 6 | Trailing-edge semantics, cancel/flush, burst collapse |
 | Android release config | 17 | R8 / resource-shrinking / PNG-crunch switches, `minSdkVersion` floor, the committed proguard keeps, and the `BUILD_TARGET` ABI override the APK pipeline uses |
+| Month grid & calendar layout | 20 | Fixed 42-cell grid for every month (leap February included), Monday-first ordering, month ranges for the logged-dates query, and the grid-fit maths that keeps the expanded panel inside the card and its height identical month to month |
+| Meal reminders | 42 | Weekday mapping (Monday-first UI → expo's Sunday = 1), `nextOccurrence` across today/tomorrow/week/month/year, one-shot vs per-weekday schedules, the "no days ticked = rings once" rule, hostile stored JSON, and the reconcile pass that switches a rung one-shot alarm off |
+| Notification config | 16 | The `expo-notifications` plugin, the Android channel id, `SCHEDULE_EXACT_ALARM` present and `USE_EXACT_ALARM` deliberately absent, the package id the exact-alarm deep link targets, SDK-matched dependency versions, and a source scan proving neither `expo-notifications` nor `expo-intent-launcher` (both of which throw on import where their native half is missing) can reach the bundle's startup path |
+| Release workflow | 11 | Manual builds can publish (inputs + job condition), artifacts merge into one directory, the tag is cut at the built commit, and the shipped tag-validation regex accepts `v1.2.3[-rc.1]` while rejecting junk |
 
 ---
 
@@ -362,7 +386,7 @@ Building the app is a second, deliberately manual workflow — a build only ever
 | Workflow | Trigger | What it runs | What you get |
 | --- | --- | --- | --- |
 | [ci.yml](.github/workflows/ci.yml) | every push / PR | `npm run ci`, then a Metro bundle smoke check | a pass/fail badge — nothing to download |
-| [build-apk.yml](.github/workflows/build-apk.yml) | **Actions → Build APK**, or a `v*` tag | those same gates, then `expo prebuild` + the Gradle release build | `MacroMax-<version>-arm.apk` or `.aab`, the R8 mapping, and a GitHub Release on tags |
+| [build-apk.yml](.github/workflows/build-apk.yml) | **Actions → Build APK**, or a `v*` tag | those same gates, then `expo prebuild` + the Gradle release build | `MacroMax-<version>-arm.apk` or `.aab`, the R8 mapping, and a GitHub Release on tags **or on a manual run with *publish a release* ticked** |
 
 `build-apk.yml` is the no-EAS path: inputs, signing, secrets and the post-build checks it enforces are documented under [Build an APK without EAS](#build-an-apk-without-eas).
 
@@ -376,14 +400,19 @@ Only the parts you need to navigate: full file lists live in the directories the
 MacroMax/
 ├── app/                  # Expo Router screens
 │                         #   (tabs)/ Today · Log · Recipe · Analytics · Settings
-│                         #   login · search · scanner · root and tab layouts
-├── components/           # Reusable UI: cards, rings, donut, sheets, scanner, week strip, tab bar
+│                         #   login · search · scanner · alarms · alarm-edit
+│                         #   root and tab layouts
+├── components/           # Reusable UI: cards, rings, donut, sheets, scanner, week strip,
+│                         #   month calendar, time wheel, weekday chips, tab bar
 ├── src/
-│   ├── hooks/            # useDailyLog · useFoodSearch · useProfile · useAuth · useSyncStatus · …
+│   ├── hooks/            # useDailyLog · useFoodSearch · useProfile · useAuth · useSyncStatus
+│   │                     #   useLoggedDatesInMonth · useMealReminders · …
 │   ├── lib/              # Pure, unit-tested core
 │   │                     #   db · nutrition · api (3-tier search) · seedDb · servingUnits
 │   │                     #   fatSecret · openFoodFacts · fallbackFoods · foodResults
 │   │                     #   backup · backupData · greeting · trendSeries · debounce · http
+│   │                     #   monthGrid (calendar maths) · mealReminders (alarm rules)
+│   │                     #   notifications (expo-notifications adapter)
 │   ├── theme/            # Emerald Ring tokens: colors · shadows · typography
 │   └── types/            # Shared models (FoodItem, DailyLog, …)
 ├── assets/               # Logo, favicon, screenshots, bundled seed.db (Tier-1 FTS5 foods)

@@ -1,5 +1,5 @@
-import React, { useEffect } from "react";
-import { Stack } from "expo-router";
+import React, { useCallback, useEffect } from "react";
+import { Stack, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { initialWindowMetrics, SafeAreaProvider } from "react-native-safe-area-context";
 import {
@@ -12,8 +12,22 @@ import {
 } from "@expo-google-fonts/manrope";
 import "../global.css";
 import { COLORS } from "@/src/theme/colors";
+import { configureNotificationHandler, useNotificationOpenHandler } from "@/src/lib/notifications";
+import { useMealReminderWatchdog } from "@/src/hooks/useMealReminders";
+
+/*
+ * Foreground presentation for meal reminders: while the app IS open the OS
+ * hands the notification to this handler, so it has to opt into showing a
+ * banner. When the app is closed the OS shows it on its own — no JS needed.
+ *
+ * Safe at module scope: it loads expo-notifications lazily and no-ops where the
+ * module cannot be imported at all (Expo Go) instead of throwing on import.
+ */
+configureNotificationHandler();
 
 export default function RootLayout() {
+  const router = useRouter();
+
   // Start loading Manrope, but never let it gate the first paint: if the fonts
   // are slow or fail to load, the app used to sit on a full-screen spinner
   // forever. Text falls back to the system font and swaps in when ready.
@@ -30,6 +44,21 @@ export default function RootLayout() {
       console.warn("Manrope could not be loaded; using the system font.", fontError);
     }
   }, [fontError]);
+
+  /*
+   * Reconcile meal reminders on launch and on every return to the foreground:
+   * a one-shot alarm cannot un-set itself while the app is dead, so this is
+   * where "it already rang" is noticed and the switch is turned off.
+   */
+  useMealReminderWatchdog();
+
+  // Tapping a reminder lands on the Daily Log, where the meal is logged. The
+  // handler also covers the cold start (see useNotificationOpenHandler), and
+  // is a no-op where reminders cannot be delivered.
+  const openDailyLog = useCallback(() => {
+    router.push("/log");
+  }, [router]);
+  useNotificationOpenHandler(openDailyLog);
 
   return (
     /*
@@ -51,6 +80,8 @@ export default function RootLayout() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="search" />
         <Stack.Screen name="scanner" />
+        <Stack.Screen name="alarms" />
+        <Stack.Screen name="alarm-edit" />
       </Stack>
     </SafeAreaProvider>
   );

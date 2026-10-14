@@ -26,7 +26,8 @@
       "permissions": [
         "CAMERA",
         "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO"
+        "android.permission.RECORD_AUDIO",
+        "android.permission.SCHEDULE_EXACT_ALARM"
       ]
     },
     "web": {
@@ -42,7 +43,14 @@
       ],
       "expo-font",
       "expo-sqlite",
-      "expo-sharing"
+      "expo-sharing",
+      [
+        "expo-notifications",
+        {
+          "color": "#10B981",
+          "defaultChannel": "meal-reminders"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

@@ -5,18 +5,17 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { RequireAuth } from "@/components/RequireAuth";
 import { AppHeader } from "@/components/AppHeader";
-import { WeekStrip } from "@/components/WeekStrip";
+import { MonthCalendar } from "@/components/MonthCalendar";
 import { MealSlot } from "@/components/MealSlot";
 import { useTabBarClearance } from "@/components/ScrollableTabBar";
 import { useAuth } from "@/src/hooks/useAuth";
 import { useDailyLog } from "@/src/hooks/useDailyLog";
-import { useWeekLoggedDates } from "@/src/hooks/useWeekLoggedDates";
+import { useLoggedDatesInMonth } from "@/src/hooks/useLoggedDatesInMonth";
+import { weekOf } from "@/src/lib/monthGrid";
 import { lockDay, unlockDay } from "@/src/lib/db";
 import {
-  addDays,
   calculateTotals,
   groupMealItemsByType,
-  startOfWeek,
   toLocalDateString,
 } from "@/src/lib/nutrition";
 import { BRAND, COLORS, MACRO_COLORS } from "@/src/theme/colors";
@@ -44,12 +43,14 @@ function LogContent() {
 
   const todayString = useMemo(() => toLocalDateString(new Date()), []);
 
-  const weekDates = useMemo(() => {
-    const monday = startOfWeek(new Date());
-    return Array.from({ length: 7 }, (_, index) => addDays(monday, index));
-  }, []);
+  // Strip follows the selected day so a month-grid selection is always visible
+  // in the week above it (see MonthCalendar).
+  const weekDates = useMemo(() => weekOf(selectedDate), [selectedDate]);
 
-  const { loggedDates, refresh: refreshLoggedDates } = useWeekLoggedDates(userId, weekDates);
+  const { loggedDates, refresh: refreshLoggedDates } = useLoggedDatesInMonth(
+    userId,
+    selectedDate
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -104,8 +105,9 @@ function LogContent() {
           </Text>
         </View>
 
-        {/* Week strip — shared, uniform-height day chips (see WeekStrip) */}
-        <WeekStrip
+        {/* Week strip + collapsible whole-month view (see MonthCalendar) */}
+        <MonthCalendar
+          anchor={selectedDate}
           weekDates={weekDates}
           selectedDate={selectedDate}
           onSelectDate={setSelectedDate}

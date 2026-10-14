@@ -21,6 +21,12 @@
 #   artifact  apk        installable APK (default)
 #             aab        app bundle for Play Console
 #             both       both of the above
+#   publish_release  false (default) build only; true ALSO publishes a GitHub
+#                    Release with the artifact attached, so a manual run no
+#                    longer costs a trip to the Artifacts list. The tag is
+#                    release_tag, or v<app.json version> when left blank.
+#   release_tag      tag for a manual publish (also accepted as "1.2.3")
+#   prerelease       mark the published release as a pre-release
 #
 # Signing
 #   Out of the box the APK is signed with the debug key the Expo template ships
@@ -48,6 +54,18 @@ on:
           - apk
           - aab
           - both
+      publish_release:
+        description: "Also publish a GitHub Release with the built artifact"
+        type: boolean
+        default: false
+      release_tag:
+        description: "Release tag for a manual publish (blank = v<app.json version>)"
+        type: string
+        default: ""
+      prerelease:
+        description: "Mark the published release as a pre-release"
+        type: boolean
+        default: false
   push:
     tags:
       - "v*"
@@ -450,11 +468,14 @@ jobs:
 
   # ── Release ─────────────────────────────────────────────────────────────────
   # Tagging `v1.2.3` both builds and publishes: the CD half of the pipeline.
+  # A manual run can publish too — that is what `publish_release` is for; the
+  # tag-only condition this job used to carry meant every hand-triggered build
+  # silently skipped it and left you downloading the APK from Artifacts.
   release:
     name: "Publish GitHub Release"
     runs-on: ubuntu-latest
     needs: build
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publish_release)
     permissions:
       contents: write
 
@@ -463,27 +484,80 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: dist
+          # Flatten macromax-apk/ and build-metadata/ into one directory.
+          merge-multiple: true
+
+      - name: Resolve the release tag
+        id: tag
+        env:
+          INPUT_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            # Manual publish: the run's ref is a branch, so the tag has to come
+            # from the input or from app.json's version.
+            DEFAULT_TAG="v$(node -p "require('./app.json').expo.version")"
+            TAG="${INPUT_TAG:-$DEFAULT_TAG}"
+            # Accept a bare "1.2.3" as well as "v1.2.3".
+            case "$TAG" in
+              v*) ;;
+              *) TAG="v$TAG" ;;
+            esac
+          else
+            TAG="$GITHUB_REF_NAME"
+          fi
+
+          if ! printf '%s' "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$'; then
+            echo "::error::'$TAG' is not a valid release tag — expected v<major>.<minor>.<patch>"
+            exit 1
+          fi
+
+          echo "Publishing $TAG"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.tag.outputs.tag }}
+          PRERELEASE: ${{ inputs.prerelease }}
         run: |
           set -euo pipefail
           find dist -type f | sort
 
           ASSETS=$(find dist -type f \( -name '*.apk' -o -name '*.aab' -o -name 'BUILD-INFO.txt' -o -name 'mapping.txt' \))
-          if [ -z "$ASSETS" ]; then
-            echo "::error::No build artifacts to publish"
+          BINARIES=$(find dist -type f \( -name '*.apk' -o -name '*.aab' \))
+          if [ -z "$ASSETS" ] || [ -z "$BINARIES" ]; then
+            echo "::error::No APK/AAB in the downloaded artifacts — nothing installable to publish"
             exit 1
           fi
 
+          FLAGS=""
+          if [ "${PRERELEASE:-false}" = "true" ]; then
+            FLAGS="--prerelease"
+          fi
+
           # Re-running the same tag should update the release, not fail on it.
-          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --clobber $ASSETS
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber $ASSETS
           else
-            gh release create "$GITHUB_REF_NAME" \
+            # --target cuts the tag at the commit this run actually built (a
+            # manual dispatch has no tag yet; a tag push already has one).
+            gh release create "$TAG" \
               --repo "$GITHUB_REPOSITORY" \
-              --title "MacroMax $GITHUB_REF_NAME" \
+              --target "$GITHUB_SHA" \
+              --title "MacroMax $TAG" \
               --generate-notes \
+              $FLAGS \
               $ASSETS
           fi
+
+          {
+            echo "### Release"
+            echo
+            echo "| field | value |"
+            echo "| --- | --- |"
+            echo "| tag | \`$TAG\` |"
+            echo "| trigger | ${{ github.event_name }} |"
+            echo "| assets | \`$(echo "$BINARIES" | xargs -n1 basename | paste -sd ', ' -)\` |"
+          } >> "$GITHUB_STEP_SUMMARY"

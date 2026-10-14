@@ -1,6 +1,8 @@
 import React, { memo, useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { RequireAuth } from "@/components/RequireAuth";
 import { AppHeader } from "@/components/AppHeader";
 import { useTabBarClearance } from "@/components/ScrollableTabBar";
@@ -8,6 +10,8 @@ import { UNIT_GRAM_DEFAULTS } from "@/src/lib/servingUnits";
 import { isFatSecretConfigured } from "@/src/lib/fatSecret";
 import { useAuth } from "@/src/hooks/useAuth";
 import { useProfile } from "@/src/hooks/useProfile";
+import { useMealReminders } from "@/src/hooks/useMealReminders";
+import { MEAL_KEYS, formatTimeLabel } from "@/src/lib/mealReminders";
 import { exportBackup, pickBackupFile } from "@/src/lib/backup";
 import { BackupError, summarizeBackup } from "@/src/lib/backupData";
 import { readAllUserData, restoreAllData } from "@/src/lib/db";
@@ -38,6 +42,48 @@ const GoalField = memo(function GoalField({ label, value, onChange }: GoalFieldP
         className="rounded-3xl bg-wash px-4 py-3 font-manrope text-ink"
       />
     </View>
+  );
+});
+
+/**
+ * Meal reminders entry point: summarizes what is armed and opens the alarms
+ * screen. Kept as its own component so the settings form never re-renders on
+ * a reminder tick.
+ */
+const MealRemindersCard = memo(function MealRemindersCard() {
+  const router = useRouter();
+  const { reminders } = useMealReminders();
+
+  const active = MEAL_KEYS.filter((meal) => reminders[meal].enabled);
+  const summary =
+    active.length === 0
+      ? "No reminders on yet — get a friendly nudge at breakfast, lunch, dinner or snack time."
+      : active
+          .map((meal) => `${reminders[meal].name} ${formatTimeLabel(reminders[meal].hour, reminders[meal].minute)}`)
+          .join(" · ");
+
+  return (
+    <Pressable
+      onPress={() => router.push("/alarms")}
+      android_ripple={null}
+      accessibilityRole="button"
+      accessibilityLabel="Open meal reminders"
+      className="mb-4 rounded-2xl bg-card p-4"
+      style={SHADOWS.card}
+    >
+      <View className="flex-row items-center">
+        <View className="flex-1">
+          <Text className="font-manrope-bold text-base text-ink">Meal reminders</Text>
+          <Text className="font-manrope mt-1 text-sm text-ink-muted">{summary}</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={18} color={COLORS.inkFaint} />
+      </View>
+      {active.length > 0 ? (
+        <Text className="font-manrope mt-2 text-xs text-primary-ink">
+          {active.length} reminder{active.length === 1 ? "" : "s"} scheduled
+        </Text>
+      ) : null}
+    </Pressable>
   );
 });
 
@@ -316,6 +362,9 @@ function SettingsContent() {
             )}
           </Pressable>
         </View>
+
+        {/* Meal reminders: breakfast / lunch / dinner / snacks */}
+        <MealRemindersCard />
 
         {/* Data management: local backup export / import (Task 4) */}
         <DataManagementCard />
