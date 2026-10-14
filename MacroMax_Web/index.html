@@ -19,25 +19,9 @@
 </head>
 
 <body>
-  <!-- Animated background -->
+  <!-- Interactive 3D Background -->
   <div class="bg" aria-hidden="true">
-    <div class="bg-orb orb-a"></div>
-    <div class="bg-orb orb-b"></div>
-    <div class="bg-orb orb-c"></div>
-    <svg class="bg-rings" viewBox="0 0 800 800" fill="none">
-      <g class="ring-spin ring-spin-1">
-        <circle cx="400" cy="400" r="330" stroke-width="26" pathLength="100" stroke-dasharray="64 36"
-          stroke-linecap="round" />
-      </g>
-      <g class="ring-spin ring-spin-2">
-        <circle cx="400" cy="400" r="270" stroke-width="22" pathLength="100" stroke-dasharray="42 58"
-          stroke-linecap="round" />
-      </g>
-      <g class="ring-spin ring-spin-3">
-        <circle cx="400" cy="400" r="215" stroke-width="2" pathLength="100" stroke-dasharray="1 3" />
-      </g>
-    </svg>
-    <div class="bg-grain"></div>
+    <canvas id="bgCanvas"></canvas>
   </div>
 
   <header class="glass-navbar">
@@ -57,17 +41,6 @@
       </nav>
 
       <div class="nav-actions">
-        <div class="theme-toggle-switch" id="themeSelector" role="group" aria-label="Theme">
-          <button type="button" class="theme-toggle-btn active" data-theme-val="emerald" title="Dark theme"
-            aria-label="Dark theme">
-            <span class="theme-dot emerald"></span><span class="theme-label">Dark</span>
-          </button>
-          <button type="button" class="theme-toggle-btn" data-theme-val="arctic" title="Light theme"
-            aria-label="Light theme">
-            <span class="theme-dot arctic"></span><span class="theme-label">Light</span>
-          </button>
-        </div>
-
         <a href="https://github.com/sebastian2006-dev/MacroMax" target="_blank" rel="noopener noreferrer"
           class="nav-github-btn" aria-label="MacroMax on GitHub">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
@@ -140,21 +113,6 @@
             <div class="phone-glass-gloss"></div>
           </div>
 
-          <div class="floating-chip chip-top-left glass-card">
-            <div class="chip-icon energy-icon">⚡</div>
-            <div class="chip-text">
-              <span class="chip-sub">Calories today</span>
-              <span class="chip-main">2,129 / 3,000 kcal</span>
-            </div>
-          </div>
-
-          <div class="floating-chip chip-bottom-right glass-card">
-            <div class="chip-icon protein-icon">🍗</div>
-            <div class="chip-text">
-              <span class="chip-sub">Protein</span>
-              <span class="chip-main">109 / 150 g</span>
-            </div>
-          </div>
         </div>
       </div>
     </section>
@@ -442,50 +400,6 @@
       </div>
     </section>
 
-    <!-- STACK -->
-    <section class="architecture-section" id="architecture">
-      <div class="section-header">
-        <h2 class="section-title">How it's built</h2>
-        <p class="section-subtitle">React Native on Expo SDK 57, strict TypeScript, and 314 automated tests.</p>
-      </div>
-
-      <div class="arch-container glass-panel spot">
-        <div class="tech-pill-grid">
-          <div class="tech-pill"><span class="tech-title">React Native 0.86</span><span class="tech-sub">Expo SDK
-              57</span></div>
-          <div class="tech-pill"><span class="tech-title">TypeScript</span><span class="tech-sub">Strict mode</span>
-          </div>
-          <div class="tech-pill"><span class="tech-title">expo-sqlite</span><span class="tech-sub">FTS5 search</span>
-          </div>
-          <div class="tech-pill"><span class="tech-title">NativeWind</span><span class="tech-sub">Tailwind CSS</span>
-          </div>
-          <div class="tech-pill"><span class="tech-title">Reanimated</span><span class="tech-sub">UI-thread
-              animation</span></div>
-          <div class="tech-pill"><span class="tech-title">314 tests</span><span class="tech-sub">All passing</span>
-          </div>
-        </div>
-
-        <h3 class="pipeline-title">How a food search is answered</h3>
-        <ol class="pipeline-flow">
-          <li class="pipeline-step">
-            <span class="step-num">1</span>
-            <span class="step-name">Bundled database</span>
-            <span class="step-desc">8,379 Indian and USDA foods, searched on-device</span>
-          </li>
-          <li class="pipeline-step">
-            <span class="step-num">2</span>
-            <span class="step-name">Device cache</span>
-            <span class="step-desc">Foods you've looked up before, replayed instantly</span>
-          </li>
-          <li class="pipeline-step">
-            <span class="step-num">3</span>
-            <span class="step-name">Online lookup</span>
-            <span class="step-desc">FatSecret and Open Food Facts, only when needed</span>
-          </li>
-        </ol>
-      </div>
-    </section>
-
     <!-- DOWNLOAD -->
     <section class="download-section" id="download">
       <div class="section-header">
@@ -535,12 +449,21 @@
             </div>
 
             <div class="apk-cta-row">
-              <a href="https://github.com/sebastian2006-dev/MacroMax/releases/latest" id="directApkBtn"
-                class="btn btn-primary btn-large">
+              <a href="downloads/MacroMax-v1.0.0.apk" download="MacroMax-v1.0.0.apk" id="directApkBtn"
+                class="btn btn-primary btn-large" style="border-radius: 9999px;">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                   <polyline points="7 10 12 15 17 10" />
                   <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                <span>Download APK Directly</span>
+              </a>
+
+              <a href="https://github.com/sebastian2006-dev/MacroMax/releases" target="_blank" rel="noopener noreferrer"
+                id="githubApkBtn" class="btn btn-glass btn-large" style="border-radius: 9999px;">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                  <path
+                    d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
                 </svg>
                 <span>Download from GitHub</span>
               </a>
@@ -657,6 +580,7 @@ cd android &amp;&amp; ./gradlew assembleRelease</code></pre>
     </div>
   </footer>
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="script.js"></script>
 </body>
 

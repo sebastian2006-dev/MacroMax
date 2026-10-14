@@ -114,7 +114,7 @@ Open http://localhost:8000. (Opening `index.html` directly also works, but a loc
 - **Ring simulator**: sliders drive the calorie and protein rings.
 - **Infinite screenshot slider**: continuous drift, drag with momentum, trackpad and arrow support, depth scaling toward the center, tap to open full size.
 - **Features, stack and download hub** (APK, install steps, build from source).
-- **Dark and light themes**, remembered in `localStorage`.
+- **Dark theme only** — the light theme and its navbar toggle were removed.
 ## Tweaks
  
 Top of `initScreenSlider()` in `script.js`:

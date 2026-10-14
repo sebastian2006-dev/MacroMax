@@ -1,7 +1,6 @@
 /* ==========================================================================
    MACROMAX PROMO SITE
-   Glass surfaces over an animated emerald field. Dark ("emerald") and light
-   ("arctic") themes share the same tokens.
+   Glass surfaces over an animated emerald field. One dark theme.
    ========================================================================== */
 
 :root {
@@ -56,42 +55,6 @@
   --spot-border: rgba(52, 211, 153, 0.75);
   --ring-track: rgba(255, 255, 255, 0.07);
   --phone-rim: #1a2420;
-}
-
-/* ---------- Light theme ---------- */
-[data-theme="arctic"] {
-  --bg-primary: #f3f8f6;
-  --bg-card: rgba(255, 255, 255, 0.6);
-  --bg-card-hover: rgba(255, 255, 255, 0.85);
-  --bg-glass: rgba(255, 255, 255, 0.6);
-  --border-glass: rgba(255, 255, 255, 0.85);
-  --border-subtle: rgba(15, 23, 42, 0.08);
-  --border-highlight: rgba(5, 150, 105, 0.5);
-
-  --accent-primary: #059669;
-  --accent-glow: #047857;
-  --accent-secondary: #0284c7;
-  --accent-tint: rgba(16, 185, 129, 0.12);
-  --on-accent: #ffffff;
-
-  --text-primary: #0b1a14;
-  --text-secondary: #3b4d46;
-  --text-muted: #6a7b74;
-
-  --card-shadow: 0 20px 45px -22px rgba(15, 60, 45, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.95);
-  --card-shadow-hover: 0 30px 60px -24px rgba(15, 60, 45, 0.35), 0 0 0 1px rgba(5, 150, 105, 0.12), inset 0 1px 0 #fff;
-
-  --orb-a: rgba(16, 185, 129, 0.3);
-  --orb-b: rgba(14, 165, 233, 0.24);
-  --orb-c: rgba(110, 231, 183, 0.34);
-  --ring-stroke: rgba(5, 150, 105, 0.13);
-  --grain-opacity: 0.04;
-
-  --card-solid: rgba(255, 255, 255, 0.8);
-  --spot: rgba(16, 185, 129, 0.14);
-  --spot-border: rgba(5, 150, 105, 0.7);
-  --ring-track: rgba(15, 23, 42, 0.07);
-  --phone-rim: #cbd5d1;
 }
 
 /* ==========================================================================
@@ -435,56 +398,6 @@ code {
   display: flex;
   align-items: center;
   gap: 10px;
-}
-
-.theme-toggle-switch {
-  display: flex;
-  padding: 3px;
-  background: var(--border-subtle);
-  border-radius: var(--radius-full);
-}
-
-.theme-toggle-btn {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 6px 12px;
-  border: 0;
-  border-radius: var(--radius-full);
-  background: transparent;
-  color: var(--text-secondary);
-  font: 600 0.8rem var(--font-body);
-  cursor: pointer;
-  transition: background 0.35s var(--ease-out), color 0.3s ease, transform 0.3s var(--ease-out);
-}
-
-.theme-toggle-btn:hover {
-  color: var(--text-primary);
-}
-
-.theme-toggle-btn:active {
-  transform: scale(0.95);
-}
-
-.theme-toggle-btn.active {
-  background: var(--bg-card-hover);
-  color: var(--text-primary);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
-}
-
-.theme-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-}
-
-.theme-dot.emerald {
-  background: linear-gradient(135deg, #10b981, #06b6d4);
-}
-
-.theme-dot.arctic {
-  background: linear-gradient(135deg, #f8fafc, #94a3b8);
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.18);
 }
 
 .nav-github-btn {
@@ -2106,10 +2019,6 @@ section {
     padding-right: 0;
   }
 
-  .theme-label {
-    display: none;
-  }
-
   .glass-navbar {
     padding-left: 12px;
   }
@@ -2235,4 +2144,15 @@ section {
   .bg-orb {
     animation: none !important;
   }
+}
+
+/* 3D Canvas overrides */
+#bgCanvas {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 0;
+  pointer-events: none;
+  /* Lets clicks pass through to your buttons */
 }

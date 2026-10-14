@@ -1,6 +1,6 @@
 /**
  * MacroMax promo site
- * Theme switcher, ambient motion, cursor spotlight, nav indicator, demo video,
+ * Ambient motion, cursor spotlight, nav indicator, demo video,
  * ring simulator, infinite screenshot slider, lightbox, download tabs.
  */
 
@@ -8,7 +8,6 @@ const REDUCED_MOTION = window.matchMedia('(prefers-reduced-motion: reduce)').mat
 const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
 
 document.addEventListener('DOMContentLoaded', () => {
-  initThemeSwitcher();
   initAmbientMotion();
   initSpotlight();
   initNavIndicator();
@@ -19,32 +18,8 @@ document.addEventListener('DOMContentLoaded', () => {
   initScreenSlider();
   initDownloadTabs();
   initCopyChecksum();
+  init3DBackground();
 });
-
-/* --------------------------------------------------------------------------
-   Theme switcher
-   -------------------------------------------------------------------------- */
-function initThemeSwitcher() {
-  const buttons = document.querySelectorAll('.theme-toggle-btn');
-  let saved = 'emerald';
-  try { saved = localStorage.getItem('macromax_theme') || 'emerald'; } catch (_) { }
-
-  const apply = (name) => {
-    document.documentElement.setAttribute('data-theme', name);
-    buttons.forEach((b) => {
-      const on = b.dataset.themeVal === name;
-      b.classList.toggle('active', on);
-      b.setAttribute('aria-pressed', String(on));
-    });
-  };
-
-  apply(saved === 'arctic' ? 'arctic' : 'emerald');
-
-  buttons.forEach((b) => b.addEventListener('click', () => {
-    apply(b.dataset.themeVal);
-    try { localStorage.setItem('macromax_theme', b.dataset.themeVal); } catch (_) { }
-  }));
-}
 
 /* --------------------------------------------------------------------------
    Ambient motion: background parallax + hero phone tilt + chip drift.
@@ -739,4 +714,194 @@ function initCopyChecksum() {
       btn.classList.remove('copied');
     }, 1800);
   });
+}
+
+/* --------------------------------------------------------------------------
+   Premium 3D Background (Retro Grid + Spinning Logo Rings)
+   -------------------------------------------------------------------------- */
+/* --------------------------------------------------------------------------
+   Premium 3D Background (Anodized Pearl Logo + Seamless Uniform Grid)
+   -------------------------------------------------------------------------- */
+function init3DBackground() {
+  const canvas = document.getElementById('bgCanvas');
+  if (!canvas || typeof THREE === 'undefined') return;
+
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color('#07100d');
+
+  // Soft emerald fog to blend the horizon deeply
+  scene.fog = new THREE.FogExp2('#07100d', 0.015);
+
+  const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
+  camera.position.set(0, 0, 8);
+
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+
+  // 1. Seamless Uniform Retro Grid
+  // Passing '#1f3d2f' for BOTH arguments removes the bright center crosshairs
+  const gridHelper = new THREE.GridHelper(120, 120, '#1f3d2f', '#1f3d2f');
+  gridHelper.position.y = -3;
+  scene.add(gridHelper);
+
+  // 2. 3D Logo Group
+  const logoGroup = new THREE.Group();
+  scene.add(logoGroup);
+  logoGroup.position.set(0, 0, 0);
+
+  // --- DRAW THE PREMIUM PEARL "M" ---
+  const mGroup = new THREE.Group();
+
+  // High-end frosted ceramic/pearl white finish
+  const mMat = new THREE.MeshPhysicalMaterial({
+    color: 0xffffff,
+    metalness: 0.2,
+    roughness: 0.15,
+    clearcoat: 1.0,
+    clearcoatRoughness: 0.1,
+    emissive: 0xffffff,
+    emissiveIntensity: 0.1
+  });
+
+  const r = 0.26;
+  const sphGeo = new THREE.SphereGeometry(r, 64, 64);
+
+  // Helper to build flawless rounded tubular segments
+  function createBone(p1, p2) {
+    const dist = p1.distanceTo(p2);
+    const cylGeo = new THREE.CylinderGeometry(r, r, dist, 64, 1, true);
+    const cyl = new THREE.Mesh(cylGeo, mMat);
+
+    cyl.position.copy(p1).lerp(p2, 0.5);
+    cyl.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), p2.clone().sub(p1).normalize());
+
+    const sph1 = new THREE.Mesh(sphGeo, mMat);
+    sph1.position.copy(p1);
+    const sph2 = new THREE.Mesh(sphGeo, mMat);
+    sph2.position.copy(p2);
+
+    mGroup.add(cyl, sph1, sph2);
+  }
+
+  // Exact coordinates mapping the M shape
+  const pt1 = new THREE.Vector3(-0.9, -0.9, 0);
+  const pt2 = new THREE.Vector3(-0.9, 0.8, 0);
+  const pt3 = new THREE.Vector3(0, -0.1, 0);
+  const pt4 = new THREE.Vector3(0.9, 0.8, 0);
+  const pt5 = new THREE.Vector3(0.9, -0.9, 0);
+
+  createBone(pt1, pt2);
+  createBone(pt2, pt3);
+  createBone(pt3, pt4);
+  createBone(pt4, pt5);
+
+  mGroup.scale.set(1.15, 1.15, 1.15);
+  logoGroup.add(mGroup);
+
+  // --- ORBITING ARCS (Anodized Pearl Finish) ---
+  const arcsGroup = new THREE.Group();
+  const R = 2.7;
+  const tr = 0.24;
+  const ringSphGeo = new THREE.SphereGeometry(tr, 64, 64);
+
+  function createArc(colorHex, emissiveHex, startDeg, lengthDeg) {
+    const arcGroup = new THREE.Group();
+
+    const mat = new THREE.MeshPhysicalMaterial({
+      color: colorHex,
+      metalness: 0.65,
+      roughness: 0.35,
+      clearcoat: 1.0,
+      clearcoatRoughness: 0.2,
+      emissive: emissiveHex,
+      emissiveIntensity: 0.15
+    });
+
+    const lenRad = THREE.MathUtils.degToRad(lengthDeg);
+    const startRad = THREE.MathUtils.degToRad(startDeg);
+
+    const torusGeo = new THREE.TorusGeometry(R, tr, 64, 100, lenRad);
+    const torus = new THREE.Mesh(torusGeo, mat);
+
+    const cap1 = new THREE.Mesh(ringSphGeo, mat);
+    cap1.position.set(R, 0, 0);
+
+    const cap2 = new THREE.Mesh(ringSphGeo, mat);
+    cap2.position.set(R * Math.cos(lenRad), R * Math.sin(lenRad), 0);
+
+    torus.add(cap1, cap2);
+    arcGroup.add(torus);
+    arcGroup.rotation.z = startRad;
+    return arcGroup;
+  }
+
+  // Logo colors
+  const greenArc = createArc(0x5ddc94, 0x22a860, 100, 120);
+  const orangeArc = createArc(0xfcb23b, 0xd98a10, 240, 60);
+  const blueArc = createArc(0x4b84f3, 0x1f56cc, 320, 120);
+
+  arcsGroup.add(greenArc, orangeArc, blueArc);
+
+  // 3D tilt
+  arcsGroup.rotation.x = 1.35;
+  arcsGroup.rotation.y = 0.25;
+  logoGroup.add(arcsGroup);
+
+  // 3. Lighting (Blends the logo with the background)
+  const hemiLight = new THREE.HemisphereLight(0xffffff, '#07100d', 1.0);
+  scene.add(hemiLight);
+
+  const pointLight = new THREE.PointLight(0x34d399, 1.5, 20);
+  pointLight.position.set(2, 6, 5);
+  scene.add(pointLight);
+
+  // 4. Interaction tracking
+  let targetX = 0;
+  let targetY = 0;
+  window.addEventListener('pointermove', (e) => {
+    const x = (e.clientX / window.innerWidth) * 2 - 1;
+    const y = -(e.clientY / window.innerHeight) * 2 + 1;
+    targetX = x * 0.2;
+    targetY = y * 0.2;
+  });
+
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  // 5. Animation Loop
+  const clock = new THREE.Clock();
+
+  function animate() {
+    requestAnimationFrame(animate);
+    const time = clock.getElapsedTime();
+
+    // M hovers softly
+    mGroup.position.y = Math.sin(time * 1.5) * 0.12;
+
+    // Rings continuously orbit
+    arcsGroup.rotation.z = -time * 0.5;
+
+    // Smooth wobble to orbit path
+    arcsGroup.rotation.x = 1.35 + Math.sin(time * 0.8) * 0.1;
+    arcsGroup.rotation.y = 0.25 + Math.cos(time * 0.5) * 0.08;
+
+    // Smooth tilt of the whole logo reacting to mouse
+    logoGroup.rotation.x += (targetY - logoGroup.rotation.x) * 0.05;
+    logoGroup.rotation.y += (targetX - logoGroup.rotation.y) * 0.05;
+
+    // FLAWLESS GRID LOOP
+    gridHelper.position.z = (time * 2.0) % 1.0;
+
+    renderer.render(scene, camera);
+  }
+
+  if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    animate();
+  } else {
+    renderer.render(scene, camera);
+  }
 }
