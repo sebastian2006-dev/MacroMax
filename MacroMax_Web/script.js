@@ -720,7 +720,7 @@ function initCopyChecksum() {
    Premium 3D Background (Retro Grid + Spinning Logo Rings)
    -------------------------------------------------------------------------- */
 /* --------------------------------------------------------------------------
-   Premium 3D Background (Anodized Pearl Logo + Seamless Uniform Grid)
+   Premium 3D Background (Typographic Cuboidal Logo + Equal Rings + Seamless Grid)
    -------------------------------------------------------------------------- */
 function init3DBackground() {
   const canvas = document.getElementById('bgCanvas');
@@ -740,7 +740,6 @@ function init3DBackground() {
   renderer.setSize(window.innerWidth, window.innerHeight);
 
   // 1. Seamless Uniform Retro Grid
-  // Passing '#1f3d2f' for BOTH arguments removes the bright center crosshairs
   const gridHelper = new THREE.GridHelper(120, 120, '#1f3d2f', '#1f3d2f');
   gridHelper.position.y = -3;
   scene.add(gridHelper);
@@ -750,13 +749,10 @@ function init3DBackground() {
   scene.add(logoGroup);
   logoGroup.position.set(0, 0, 0);
 
-  // --- DRAW THE PREMIUM PEARL "M" ---
-  const mGroup = new THREE.Group();
-
-  // High-end frosted ceramic/pearl white finish
+  // --- DRAW THE TYPOGRAPHIC CUBOIDAL PEARL "M" ---
   const mMat = new THREE.MeshPhysicalMaterial({
     color: 0xffffff,
-    metalness: 0.2,
+    metalness: 0.3,
     roughness: 0.15,
     clearcoat: 1.0,
     clearcoatRoughness: 0.1,
@@ -764,48 +760,68 @@ function init3DBackground() {
     emissiveIntensity: 0.1
   });
 
-  const r = 0.26;
-  const sphGeo = new THREE.SphereGeometry(r, 64, 64);
+  const mShape = new THREE.Shape();
+  // Premium bold geometric sans-serif font proportions
+  mShape.moveTo(-1.2, -1.0);     // Bottom Left Outer
+  mShape.lineTo(-1.2, 1.0);      // Top Left Outer
+  mShape.lineTo(-0.65, 1.0);     // Top Left Inner
+  mShape.lineTo(0.0, -0.2);      // Center Dip Outer (Deep elegant drop)
+  mShape.lineTo(0.65, 1.0);      // Top Right Inner
+  mShape.lineTo(1.2, 1.0);       // Top Right Outer
+  mShape.lineTo(1.2, -1.0);      // Bottom Right Outer
+  mShape.lineTo(0.65, -1.0);     // Bottom Right Inner
+  mShape.lineTo(0.65, 0.3);      // Inner Right Stem Peak
+  mShape.lineTo(0.0, -0.9);      // Center Dip Inner (Follows outer V shape)
+  mShape.lineTo(-0.65, 0.3);     // Inner Left Stem Peak
+  mShape.lineTo(-0.65, -1.0);    // Bottom Left Inner
+  mShape.lineTo(-1.2, -1.0);     // Close Shape
 
-  // Helper to build flawless rounded tubular segments
-  function createBone(p1, p2) {
-    const dist = p1.distanceTo(p2);
-    const cylGeo = new THREE.CylinderGeometry(r, r, dist, 64, 1, true);
-    const cyl = new THREE.Mesh(cylGeo, mMat);
+  // Extrude the 2D M into a thick cuboidal block with polished beveled edges
+  const mExtrudeSettings = {
+    depth: 0.35,
+    bevelEnabled: true,
+    bevelSegments: 4,
+    steps: 1,
+    bevelSize: 0.04,
+    bevelThickness: 0.04
+  };
 
-    cyl.position.copy(p1).lerp(p2, 0.5);
-    cyl.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), p2.clone().sub(p1).normalize());
+  const mGeometry = new THREE.ExtrudeGeometry(mShape, mExtrudeSettings);
+  mGeometry.center(); // Center the block perfectly
+  const mMesh = new THREE.Mesh(mGeometry, mMat);
+  mMesh.scale.set(1.15, 1.15, 1.15);
 
-    const sph1 = new THREE.Mesh(sphGeo, mMat);
-    sph1.position.copy(p1);
-    const sph2 = new THREE.Mesh(sphGeo, mMat);
-    sph2.position.copy(p2);
-
-    mGroup.add(cyl, sph1, sph2);
-  }
-
-  // Exact coordinates mapping the M shape
-  const pt1 = new THREE.Vector3(-0.9, -0.9, 0);
-  const pt2 = new THREE.Vector3(-0.9, 0.8, 0);
-  const pt3 = new THREE.Vector3(0, -0.1, 0);
-  const pt4 = new THREE.Vector3(0.9, 0.8, 0);
-  const pt5 = new THREE.Vector3(0.9, -0.9, 0);
-
-  createBone(pt1, pt2);
-  createBone(pt2, pt3);
-  createBone(pt3, pt4);
-  createBone(pt4, pt5);
-
-  mGroup.scale.set(1.15, 1.15, 1.15);
+  const mGroup = new THREE.Group();
+  mGroup.add(mMesh);
   logoGroup.add(mGroup);
 
-  // --- ORBITING ARCS (Anodized Pearl Finish) ---
+  // --- ORBITING CUBOIDAL ARCS (Equally Divided) ---
   const arcsGroup = new THREE.Group();
   const R = 2.7;
-  const tr = 0.24;
-  const ringSphGeo = new THREE.SphereGeometry(tr, 64, 64);
+  const tr = 0.18; // Half-thickness of the square cross-section
 
-  function createArc(colorHex, emissiveHex, startDeg, lengthDeg) {
+  // Create a square 2D shape for the cross-section
+  const sqShape = new THREE.Shape();
+  sqShape.moveTo(-tr, -tr);
+  sqShape.lineTo(-tr, tr);
+  sqShape.lineTo(tr, tr);
+  sqShape.lineTo(tr, -tr);
+  sqShape.lineTo(-tr, -tr);
+
+  // Custom Curve to sweep the square along a perfectly circular arc in 3D
+  class Arc3DCurve extends THREE.Curve {
+    constructor(radius, lengthRad) {
+      super();
+      this.radius = radius;
+      this.lengthRad = lengthRad;
+    }
+    getPoint(t, optionalTarget = new THREE.Vector3()) {
+      const theta = t * this.lengthRad;
+      return optionalTarget.set(this.radius * Math.cos(theta), this.radius * Math.sin(theta), 0);
+    }
+  }
+
+  function createCuboidalArc(colorHex, emissiveHex, startDeg, lengthDeg) {
     const arcGroup = new THREE.Group();
 
     const mat = new THREE.MeshPhysicalMaterial({
@@ -821,34 +837,37 @@ function init3DBackground() {
     const lenRad = THREE.MathUtils.degToRad(lengthDeg);
     const startRad = THREE.MathUtils.degToRad(startDeg);
 
-    const torusGeo = new THREE.TorusGeometry(R, tr, 64, 100, lenRad);
-    const torus = new THREE.Mesh(torusGeo, mat);
+    const path = new Arc3DCurve(R, lenRad);
+    const arcExtrudeSettings = {
+      steps: Math.ceil(lengthDeg / 2),
+      bevelEnabled: true,
+      bevelSegments: 4,
+      bevelSize: 0.04,
+      bevelThickness: 0.04,
+      extrudePath: path
+    };
 
-    const cap1 = new THREE.Mesh(ringSphGeo, mat);
-    cap1.position.set(R, 0, 0);
+    const arcGeo = new THREE.ExtrudeGeometry(sqShape, arcExtrudeSettings);
+    const arcMesh = new THREE.Mesh(arcGeo, mat);
 
-    const cap2 = new THREE.Mesh(ringSphGeo, mat);
-    cap2.position.set(R * Math.cos(lenRad), R * Math.sin(lenRad), 0);
-
-    torus.add(cap1, cap2);
-    arcGroup.add(torus);
+    arcGroup.add(arcMesh);
     arcGroup.rotation.z = startRad;
     return arcGroup;
   }
 
-  // Logo colors
-  const greenArc = createArc(0x5ddc94, 0x22a860, 100, 120);
-  const orangeArc = createArc(0xfcb23b, 0xd98a10, 240, 60);
-  const blueArc = createArc(0x4b84f3, 0x1f56cc, 320, 120);
+  // Exact equal division: 3 segments of 100 degrees each, with exactly 20 degrees gap between them (120 spacing)
+  const greenArc = createCuboidalArc(0x5ddc94, 0x22a860, 0, 100);
+  const orangeArc = createCuboidalArc(0xfcb23b, 0xd98a10, 120, 100);
+  const blueArc = createCuboidalArc(0x4b84f3, 0x1f56cc, 240, 100);
 
   arcsGroup.add(greenArc, orangeArc, blueArc);
 
-  // 3D tilt
-  arcsGroup.rotation.x = 1.35;
-  arcsGroup.rotation.y = 0.25;
+  // Stand vertically facing the camera
+  arcsGroup.rotation.x = 0;
+  arcsGroup.rotation.y = 0;
   logoGroup.add(arcsGroup);
 
-  // 3. Lighting (Blends the logo with the background)
+  // 3. Lighting
   const hemiLight = new THREE.HemisphereLight(0xffffff, '#07100d', 1.0);
   scene.add(hemiLight);
 
@@ -882,12 +901,12 @@ function init3DBackground() {
     // M hovers softly
     mGroup.position.y = Math.sin(time * 1.5) * 0.12;
 
-    // Rings continuously orbit
+    // Cuboidal arcs continuously spin vertically around the M
     arcsGroup.rotation.z = -time * 0.5;
 
-    // Smooth wobble to orbit path
-    arcsGroup.rotation.x = 1.35 + Math.sin(time * 0.8) * 0.1;
-    arcsGroup.rotation.y = 0.25 + Math.cos(time * 0.5) * 0.08;
+    // Add a gentle 3D wobble to highlight the flat sides and beveled edges
+    arcsGroup.rotation.x = Math.sin(time * 0.8) * 0.15;
+    arcsGroup.rotation.y = Math.cos(time * 0.5) * 0.15;
 
     // Smooth tilt of the whole logo reacting to mouse
     logoGroup.rotation.x += (targetY - logoGroup.rotation.x) * 0.05;
