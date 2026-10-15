@@ -54,6 +54,20 @@ export default tseslint.config(
     },
   },
   {
+    // MacroMax_Web/ is the standalone marketing site: plain browser JS served
+    // as-is, never bundled by Metro and never imported by the app. It is not
+    // exempt from linting (real bugs there should still fail CI), it just needs
+    // one global the app rules cannot know about: `THREE`, injected by the
+    // three.js <script src> tag at the bottom of its index.html. Browser
+    // globals (window, document, …) already come from eslint-config-expo.
+    files: ["MacroMax_Web/**/*.js"],
+    languageOptions: {
+      globals: {
+        THREE: "readonly",
+      },
+    },
+  },
+  {
     files: ["test/**/*.ts"],
     rules: {
       // Node's test runner injects describe/it as globals.

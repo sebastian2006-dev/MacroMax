@@ -21,9 +21,10 @@
 #   artifact  apk        installable APK (default)
 #             aab        app bundle for Play Console
 #             both       both of the above
-#   publish_release  false (default) build only; true ALSO publishes a GitHub
-#                    Release with the artifact attached, so a manual run no
-#                    longer costs a trip to the Artifacts list. The tag is
+#   publish_release  true (default) the build also publishes a GitHub Release
+#                    with the APK/AAB, BUILD-INFO.txt and the R8 mapping
+#                    attached — never a trip to the Artifacts list by hand.
+#                    Untick it for a throwaway build-only run. The tag is
 #                    release_tag, or v<app.json version> when left blank.
 #   release_tag      tag for a manual publish (also accepted as "1.2.3")
 #   prerelease       mark the published release as a pre-release
@@ -55,9 +56,9 @@ on:
           - aab
           - both
       publish_release:
-        description: "Also publish a GitHub Release with the built artifact"
+        description: "Publish a GitHub Release with the built artifact (untick for a build-only run)"
         type: boolean
-        default: false
+        default: true
       release_tag:
         description: "Release tag for a manual publish (blank = v<app.json version>)"
         type: string
@@ -172,6 +173,14 @@ jobs:
             echo "| Artifact | \`$BUILD_ARTIFACT\` |"
             echo "| FatSecret keys | $([ -n "${EXPO_PUBLIC_FATSECRET_CLIENT_ID:-}" ] && echo 'present' || echo 'not set — FatSecret text search disabled, Open Food Facts + offline tiers still active') |"
             echo "| Release keystore | $([ -n "${RELEASE_KEYSTORE_BASE64:-}" ] && echo 'present' || echo 'not set — template debug key') |"
+            # Say up front whether this run ends at Artifacts or at a Release: a
+            # skipped release job is otherwise easy to miss until the APK is
+            # missing from the Releases page. A tag build always publishes.
+            if [ "${{ github.ref_type }}" = "tag" ] || [ "${{ inputs.publish_release }}" = "true" ]; then
+              echo "| Release | published when the build passes — \`v<version>\` unless \`release_tag\` says otherwise |"
+            else
+              echo "| Release | build-only run (\`publish_release\` unticked) — download from Artifacts |"
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
 
       # app.json + app.config.js → android/. This is the step EAS would do in the
@@ -468,9 +477,10 @@ jobs:
 
   # ── Release ─────────────────────────────────────────────────────────────────
   # Tagging `v1.2.3` both builds and publishes: the CD half of the pipeline.
-  # A manual run can publish too — that is what `publish_release` is for; the
-  # tag-only condition this job used to carry meant every hand-triggered build
-  # silently skipped it and left you downloading the APK from Artifacts.
+  # A manual run publishes too — `publish_release` defaults to true, so a plain
+  # "Run workflow" ships a Release instead of leaving you to download the APK
+  # from Artifacts by hand. The job's condition used to be tag-only, which is
+  # exactly why every hand-triggered build silently skipped this job.
   release:
     name: "Publish GitHub Release"
     runs-on: ubuntu-latest
@@ -480,6 +490,13 @@ jobs:
       contents: write
 
     steps:
+      # Every job starts with an empty workspace, so without this the only files
+      # here are the ones download-artifact drops in dist/ — and the tag step
+      # below reads app.json for its `v<version>` fallback, which would die with
+      # MODULE_NOT_FOUND and publish nothing.
+      - name: Checkout (app.json, for the default manual tag)
+        uses: actions/checkout@v4
+
       - name: Download the built artifacts
         uses: actions/download-artifact@v4
         with:

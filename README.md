@@ -14,7 +14,7 @@ Built natively with React Native (Expo SDK 57), TypeScript strict mode and Nativ
 ![Platform](https://img.shields.io/badge/platform-Android-3DDC84?logo=android&logoColor=white)
 ![Expo](https://img.shields.io/badge/Expo-SDK%2057-000020?logo=expo&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-420%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-421%20passing-brightgreen)
 ![Storage](https://img.shields.io/badge/storage-SQLite%20only-003B57?logo=sqlite&logoColor=white)
 
 ---
@@ -302,9 +302,9 @@ git tag v1.0.0
 git push origin v1.0.0        # tag push → builds AND publishes
 ```
 
-or **Actions → Build APK → Run workflow** with *Also publish a GitHub Release* ticked. The manual path uses `release_tag` when you fill it in and `v<app.json version>` otherwise (`1.2.3` is accepted as well as `v1.2.3`), validates it against `v<major>.<minor>.<patch>[-prerelease]`, and cuts the tag at the commit the run actually built (`--target $GITHUB_SHA`) — so a release no longer costs a trip to the Artifacts list. Re-running the same tag updates the existing release instead of failing on it.
+or **Actions → Build APK → Run workflow** — a manual run publishes by default (*Publish a GitHub Release with the built artifact* is already ticked), so a build lands on the Releases page without you touching the Artifacts list. Untick it only for a throwaway build. The manual path uses `release_tag` when you fill it in and `v<app.json version>` otherwise (`1.2.3` is accepted as well as `v1.2.3`), validates it against `v<major>.<minor>.<patch>[-prerelease]`, and cuts the tag at the commit the run actually built (`--target $GITHUB_SHA`, ignored by `gh` when that tag already exists). Re-running the same tag updates the existing release instead of failing on it, and the *Build plan* summary states up front whether the run ends at Artifacts or at a Release.
 
-> This is why the release job's condition is no longer tag-only: a `workflow_dispatch` run is on a branch, so the old `if: startsWith(github.ref, 'refs/tags/v')` silently skipped it for every hand-triggered build. [releaseWorkflow.test.ts](test/releaseWorkflow.test.ts) now asserts both paths.
+> Two things used to make every hand-triggered build skip the release job — the old tag-only `if: startsWith(github.ref, 'refs/tags/v')` condition (a `workflow_dispatch` run is on a branch, never a tag) and, after that was fixed, a `publish_release` switch that defaulted to *off*. [releaseWorkflow.test.ts](test/releaseWorkflow.test.ts) asserts both the condition and the new default.
 
 EAS is untouched by all of this: [eas.json](eas.json) and its profiles still work, and `BUILD_TARGET` is only ever set by this workflow.
 
@@ -338,7 +338,7 @@ Only FatSecret needs a key. Without the FatSecret pair, text search falls back t
 
 ## Testing
 
-**420 / 420 unit tests passing** plus lint (`--max-warnings 0`) and strict `tsc --noEmit`. Tests exercise the **real modules** — pure logic, no native or network dependencies — so they verify actual app behaviour rather than copies of it.
+**421 / 421 unit tests passing** plus lint (`--max-warnings 0`) and strict `tsc --noEmit`. Tests exercise the **real modules** — pure logic, no native or network dependencies — so they verify actual app behaviour rather than copies of it.
 
 ```bash
 npm test           # run all unit tests
@@ -368,7 +368,7 @@ npm run ci         # everything CI runs
 | Month grid & calendar layout | 20 | Fixed 42-cell grid for every month (leap February included), Monday-first ordering, month ranges for the logged-dates query, and the grid-fit maths that keeps the expanded panel inside the card and its height identical month to month |
 | Meal reminders | 42 | Weekday mapping (Monday-first UI → expo's Sunday = 1), `nextOccurrence` across today/tomorrow/week/month/year, one-shot vs per-weekday schedules, the "no days ticked = rings once" rule, hostile stored JSON, and the reconcile pass that switches a rung one-shot alarm off |
 | Notification config | 16 | The `expo-notifications` plugin, the Android channel id, `SCHEDULE_EXACT_ALARM` present and `USE_EXACT_ALARM` deliberately absent, the package id the exact-alarm deep link targets, SDK-matched dependency versions, and a source scan proving neither `expo-notifications` nor `expo-intent-launcher` (both of which throw on import where their native half is missing) can reach the bundle's startup path |
-| Release workflow | 11 | Manual builds can publish (inputs + job condition), artifacts merge into one directory, the tag is cut at the built commit, and the shipped tag-validation regex accepts `v1.2.3[-rc.1]` while rejecting junk |
+| Release workflow | 12 | Manual builds publish by default (input default + job condition) with a documented build-only opt-out, artifacts merge into one directory, the run summary states whether a Release is expected, the tag is cut at the built commit, and the shipped tag-validation regex accepts `v1.2.3[-rc.1]` while rejecting junk |
 
 ---
 
@@ -386,7 +386,7 @@ Building the app is a second, deliberately manual workflow — a build only ever
 | Workflow | Trigger | What it runs | What you get |
 | --- | --- | --- | --- |
 | [ci.yml](.github/workflows/ci.yml) | every push / PR | `npm run ci`, then a Metro bundle smoke check | a pass/fail badge — nothing to download |
-| [build-apk.yml](.github/workflows/build-apk.yml) | **Actions → Build APK**, or a `v*` tag | those same gates, then `expo prebuild` + the Gradle release build | `MacroMax-<version>-arm.apk` or `.aab`, the R8 mapping, and a GitHub Release on tags **or on a manual run with *publish a release* ticked** |
+| [build-apk.yml](.github/workflows/build-apk.yml) | **Actions → Build APK**, or a `v*` tag | those same gates, then `expo prebuild` + the Gradle release build | `MacroMax-<version>-arm.apk` or `.aab`, the R8 mapping, and a GitHub Release on every tag **and every manual run that leaves the publish switch ticked (the default)** |
 
 `build-apk.yml` is the no-EAS path: inputs, signing, secrets and the post-build checks it enforces are documented under [Build an APK without EAS](#build-an-apk-without-eas).
 

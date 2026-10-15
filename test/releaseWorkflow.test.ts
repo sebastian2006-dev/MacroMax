@@ -47,9 +47,12 @@ describe("manual dispatch can publish a release", () => {
     }
   });
 
-  it("defaults the release switch to off, so a plain build stays a build", () => {
+  it("publishes a plain manual build by default, with a documented opt-out", () => {
     const block = dispatchInputs.slice(dispatchInputs.indexOf("publish_release:"));
-    assert.match(block.slice(0, 200), /type: boolean\n\s+default: false/);
+    assert.match(block.slice(0, 300), /type: boolean\n\s+default: true/);
+    // The escape hatch for a throwaway build must stay spelled out, since the
+    // default now attaches a Release to every run.
+    assert.match(block.slice(0, 300), /build-only run/i);
   });
 
   it("runs the release job on a version tag OR a manual publish", () => {
@@ -57,6 +60,11 @@ describe("manual dispatch can publish a release", () => {
     assert.match(condition, /startsWith\(github\.ref, 'refs\/tags\/v'\)/);
     assert.match(condition, /github\.event_name == 'workflow_dispatch'/);
     assert.match(condition, /inputs\.publish_release/);
+  });
+
+  it("states in the run summary whether the run ends in a Release", () => {
+    assert.match(workflow, /\| Release \| published when the build passes/);
+    assert.match(workflow, /\| Release \| build-only run/);
   });
 
   it("still depends on a successful build and keeps write access to releases", () => {
@@ -72,8 +80,12 @@ describe("manual dispatch can publish a release", () => {
     assert.match(releaseJob, /--target "\$GITHUB_SHA"/);
   });
 
-  it("falls back to the app version for a manual tag", () => {
+  it("falls back to the app version for a manual tag, with app.json on disk", () => {
     assert.match(releaseJob, /require\('\.\/app\.json'\)\.expo\.version/);
+    // That fallback reads app.json out of the workspace, so this job must check
+    // the repo out itself: a runner workspace starts empty apart from the
+    // downloaded artifacts, and the tag step would fail with MODULE_NOT_FOUND.
+    assert.match(releaseJob, /uses: actions\/checkout@v4/);
     assert.match(appJson.expo.version, /^\d+\.\d+\.\d+$/);
   });
 
