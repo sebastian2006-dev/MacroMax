@@ -1,7 +1,7 @@
 /**
  * MacroMax promo site
  * Ambient motion, cursor spotlight, nav indicator, demo video,
- * ring simulator, infinite screenshot slider, lightbox, download tabs.
+ * ring simulator, screenshot deck, lightbox, download tabs.
  */
 
 const REDUCED_MOTION = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -14,8 +14,8 @@ document.addEventListener('DOMContentLoaded', () => {
   initHeroCounter();
   initVideoPlayer();
   initRingSimulator();
-  initLightbox();       // before the slider so it can read the original cards
-  initScreenSlider();
+  initLightbox();       // before the deck so it can read the cards
+  initScreenDeck();
   initDownloadTabs();
   initCopyChecksum();
   init3DBackground();
@@ -372,215 +372,375 @@ function initRingSimulator() {
 }
 
 /* --------------------------------------------------------------------------
-   Infinite screenshot slider
+   Screenshot deck
 
-   One requestAnimationFrame loop owns the position (x) and a velocity (v).
-   - The track is moved with translate3d only, so it stays on the GPU.
-   - Velocity eases toward a slow drift using frame-rate independent damping,
-     which is what makes flicks, arrow nudges and slow-downs feel continuous.
-   - The loop is seamless because x is wrapped with modulo against the exact
-     pixel width of one set of cards. There is no scroll-position jumping.
-   - Cards nearer the middle of the viewport are slightly larger and brighter.
+   Five screens stacked like a deck of photos: the front card is full size and
+   the cards behind it sit a step higher, a step smaller and a shade darker.
+
+   There is no clone and no scroll offset to reset. The whole deck is derived
+   from one number, "active": every card's place in the stack comes from it
+   with a modulo, so the deck loops forever in both directions.
+
+   A step is (dir, from): dir is which way the deck travels and "from" is the
+   side the arriving card comes up through. The card on top always leaves by
+   the opposite side.
+     - dir +1: the top card falls away and the next card is dealt in
+     - dir -1: the top card settles back into the pile and the previous card
+               is set back down on top
+   A swipe always deals forward, so the card falls the way you pushed it and
+   the next screen arrives from the other side.
+   Each step is one CSS transition per card. Nothing runs per frame except
+   while a finger is dragging the deck.
    -------------------------------------------------------------------------- */
-function initScreenSlider() {
-  const viewport = document.getElementById('scrollerViewport');
-  const track = document.getElementById('scrollerTrack');
-  const prevBtn = document.getElementById('scrollerPrevBtn');
-  const nextBtn = document.getElementById('scrollerNextBtn');
-  if (!viewport || !track) return;
+function initScreenDeck() {
+  const stage = document.getElementById('deckStage');
+  const track = document.getElementById('deckTrack');
+  const prevBtn = document.getElementById('deckPrevBtn');
+  const nextBtn = document.getElementById('deckNextBtn');
+  const barsEl = document.getElementById('deckBars');
+  const titleEl = document.getElementById('deckTitle');
+  const descEl = document.getElementById('deckDesc');
+  const modal = document.getElementById('lightboxModal');
+  if (!stage || !track) return;
 
-  // Set to true if you want the vertical mouse wheel to scroll the slider
-  // instead of the page while the cursor is over it.
-  const CAPTURE_VERTICAL_WHEEL = false;
+  const cards = Array.from(track.querySelectorAll('.deck-card'));
+  const total = cards.length;
+  if (!total) return;
 
-  const DRIFT = REDUCED_MOTION ? 0 : 34;  // px per second, auto movement
-  const DAMPING = 3;                      // higher = settles faster
-  const NUDGE = 1150;                     // velocity added by an arrow press
+  /* Feel. Tune these, not the maths below. */
+  const DEPTH = 3;          // cards of the stack you can see at once
+  const LIFT = 26;          // px higher for every step back
+  const SHRINK = 0.03;      // scale lost for every step back (keeps the lift visible)
+  const TILT = 1.35;        // degrees of lean for every step back
+  const SCRIM = 0.22;       // how much darker every step back gets
+  const PARK = 30;          // extra lift for cards waiting outside the stack
+  const DROP = 30;          // drops the stack below the middle of the stage
+  const FLY = 560;          // ms the flicked card takes to leave
+  const SWIPE = 58;         // px of drag that commits to the next card
+  const CHAIN = 300;        // ms between steps when a bar is clicked far away
+  const AUTOPLAY = 6500;    // ms between automatic deals (0 to stay put)
 
-  const originals = Array.from(track.children);
-  originals.forEach((card, i) => {
+  const items = cards.map((card, i) => {
     card.dataset.index = String(i);
     card.setAttribute('role', 'button');
-    card.tabIndex = 0;
+    card.setAttribute('aria-roledescription', 'screenshot');
     card.setAttribute('aria-label', `${card.dataset.title}, open full size`);
+    return { title: card.dataset.title || '', desc: card.dataset.desc || '' };
   });
 
-  let x = 0;
-  let v = 0;
-  let setWidth = 0;
-  let viewWidth = 0;
-  let cards = [];
-  let centers = [];
+  const bars = [];
+  if (barsEl) {
+    items.forEach((item, i) => {
+      const bar = document.createElement('button');
+      bar.type = 'button';
+      bar.className = 'deck-bar';
+      bar.setAttribute('aria-label', `Show ${item.title}`);
+      bar.addEventListener('click', () => { handOff(); jumpTo(i); });
+      barsEl.appendChild(bar);
+      bars.push(bar);
+    });
+  }
 
-  let hovering = false;
-  let focused = false;
-  let visible = true;
+  let active = 0;          // index of the card on top of the deck
+  let dragX = 0;           // px the deck is following a finger
+  let auto = AUTOPLAY > 0 && !REDUCED_MOTION;
+  let autoTimer = 0;
+  let chainTimer = 0;
+  let captionTimer = 0;
+  let paused = false;      // pointer or keyboard is on the deck
+  let onScreen = true;
   let pressing = false;
-  let dragging = false;
-  let justDragged = false;
+  let pointerId = null;
   let startX = 0;
   let lastX = 0;
-  let lastT = 0;
-  let dragV = 0;
-  let pointerId = null;
+  let travel = 0;
+  let lastStepAt = 0;
+  let wheelAcc = 0;
+  let wheelReset = 0;
+  let stepTimer = 0;
+  let arriveTimer = 0;
 
-  const wrap = (n) => (setWidth ? ((n % setWidth) + setWidth) % setWidth : 0);
+  const flying = new Map();     // card index -> direction it is leaving in
+  const flyTimers = new Map();
 
-  function build() {
-    track.querySelectorAll('[data-clone]').forEach((n) => n.remove());
+  const slotOf = (i) => (i - active + total) % total;
 
-    const gap = parseFloat(getComputedStyle(track).columnGap) || 28;
-    viewWidth = viewport.clientWidth;
-    setWidth = originals.reduce((sum, c) => sum + c.offsetWidth + gap, 0);
+  /* ---- Painting -------------------------------------------------------- */
+  function paint(i, drag) {
+    const card = cards[i];
 
-    const copies = Math.max(1, Math.ceil(viewWidth / setWidth));
-    for (let k = 0; k < copies; k++) {
-      originals.forEach((card) => {
-        const clone = card.cloneNode(true);
-        clone.dataset.clone = 'true';
-        clone.setAttribute('aria-hidden', 'true');
-        clone.tabIndex = -1;
-        track.appendChild(clone);
-      });
+    if (flying.has(i)) {
+      const dir = flying.get(i);
+      card.classList.add('is-exit');
+      card.style.zIndex = String(total + 6);
+      card.style.opacity = '0';
+      card.style.setProperty('--scrim', '0');
+      card.style.transform =
+        `translate(-50%, -50%) translate3d(${(dir * 74).toFixed(2)}%, ${DROP + 30}px, 0) ` +
+        `rotate(${(dir * 11).toFixed(2)}deg) scale(0.92)`;
+      return;
     }
 
-    cards = Array.from(track.children);
-    centers = cards.map((c) => c.offsetLeft + c.offsetWidth / 2);
+    const slot = slotOf(i);
+    const depth = Math.min(slot, DEPTH);
+    const visible = slot < DEPTH;
+    const lift = DROP - LIFT * depth - (visible ? 0 : PARK);
+    const scale = 1 - SHRINK * depth;
+    const follow = drag * Math.max(1 - depth * 0.3, 0.12);
+
+    card.classList.toggle('is-parked', !visible);
+    card.style.zIndex = String(total + 2 - slot);
+    card.style.opacity = visible ? '1' : '0';
+    card.style.setProperty('--scrim', visible ? (depth * SCRIM).toFixed(3) : '0');
+    card.style.transform =
+      `translate(-50%, -50%) translate3d(${follow.toFixed(2)}px, ${lift.toFixed(2)}px, 0) ` +
+      `rotate(${(TILT * depth).toFixed(2)}deg) scale(${scale.toFixed(4)})`;
+  }
+
+  function positions(drag) {
+    for (let i = 0; i < total; i++) paint(i, drag);
+  }
+
+  function chrome() {
+    for (let i = 0; i < total; i++) {
+      const front = !flying.has(i) && slotOf(i) === 0;
+      cards[i].classList.toggle('is-front', front);
+      cards[i].tabIndex = front ? 0 : -1;
+      cards[i].setAttribute('aria-hidden', front ? 'false' : 'true');
+    }
+    bars.forEach((bar, i) => {
+      const on = i === active;
+      bar.classList.toggle('is-active', on);
+      bar.setAttribute('aria-current', on ? 'true' : 'false');
+    });
   }
 
   function render() {
-    x = wrap(x);
-    track.style.transform = `translate3d(${-x}px, 0, 0)`;
-
-    const mid = x + viewWidth / 2;
-    const reach = viewWidth * 0.62;
-    for (let i = 0; i < cards.length; i++) {
-      const d = Math.min(Math.abs(centers[i] - mid) / reach, 1);
-      const eased = d * d;
-      cards[i].style.transform = `scale(${(1 - eased * 0.085).toFixed(4)})`;
-      cards[i].style.opacity = (1 - eased * 0.5).toFixed(3);
-    }
+    positions(dragX);
+    chrome();
   }
 
-  let last = performance.now();
-  function frame(now) {
-    const dt = Math.min((now - last) / 1000, 0.05);
-    last = now;
-
-    if (visible && !dragging) {
-      const paused = hovering || focused;
-      const goal = paused ? 0 : DRIFT;
-      v += (goal - v) * (1 - Math.exp(-dt * DAMPING));
-      x += v * dt;
-    }
-    if (visible) render();
-    requestAnimationFrame(frame);
+  /* ---- Caption --------------------------------------------------------- */
+  function captions(instant) {
+    const apply = () => {
+      if (titleEl) titleEl.textContent = items[active].title;
+      if (descEl) descEl.textContent = items[active].desc;
+    };
+    if (instant || REDUCED_MOTION || !titleEl || !descEl) { apply(); return; }
+    if (captionTimer) return;                       // a swap is already in flight
+    titleEl.classList.add('is-out');
+    descEl.classList.add('is-out');
+    captionTimer = setTimeout(() => {
+      captionTimer = 0;
+      apply();
+      titleEl.classList.remove('is-out');
+      descEl.classList.remove('is-out');
+    }, 160);
   }
 
-  /* ---- Drag with momentum ---- */
-  viewport.addEventListener('pointerdown', (e) => {
-    if (e.pointerType === 'mouse' && e.button !== 0) return;
-    pressing = true;
-    dragging = false;
-    pointerId = e.pointerId;
-    startX = lastX = e.clientX;
-    lastT = performance.now();
-    dragV = 0;
+  /* ---- Moving the deck ------------------------------------------------- */
+  function flyOff(i, side) {
+    flying.set(i, side);
+    if (flyTimers.has(i)) clearTimeout(flyTimers.get(i));
+    flyTimers.set(i, setTimeout(() => {
+      flying.delete(i);
+      flyTimers.delete(i);
+      cards[i].classList.remove('is-exit');
+      paint(i, dragX);
+      chrome();
+    }, FLY + 90));
+    paint(i, 0);
+  }
+
+  // Lays a card down on top of the deck: park it off to the side it comes up
+  // through with no transition first, commit that pose, then let the step
+  // animate out of it.
+  function dealIn(i, from) {
+    const card = cards[i];
+    card.style.transition = 'none';
+    card.style.opacity = '0';
+    card.style.setProperty('--scrim', '0');
+    card.style.zIndex = String(total + 6);
+    card.style.transform =
+      `translate(-50%, -50%) translate3d(${(from * 58).toFixed(2)}%, ${DROP - 46}px, 0) ` +
+      `rotate(${(from * 13).toFixed(2)}deg) scale(0.9)`;
+    void card.offsetWidth;
+    card.style.transition = '';
+  }
+
+  // The pile only shifts a few pixels, so it settles quicker than a card that
+  // has to cross the whole stage to reach the top.
+  function stepping() {
+    track.classList.add('is-stepping');
+    clearTimeout(stepTimer);
+    stepTimer = setTimeout(() => track.classList.remove('is-stepping'), 780);
+  }
+
+  function arriving(card) {
+    cards.forEach((c) => c.classList.remove('is-dealing'));
+    card.classList.add('is-dealing');
+    clearTimeout(arriveTimer);
+    arriveTimer = setTimeout(() => card.classList.remove('is-dealing'), 840);
+  }
+
+  function step(dir, from) {
+    if (total < 2) return;
+    const leaving = active;
+    active = (active + dir + total) % total;
+    lastStepAt = performance.now();
+    if (!REDUCED_MOTION) {
+      if (dir > 0) flyOff(leaving, -from);   // the top card falls the way it was pushed
+      dealIn(active, from);                  // the next screen comes up through `from`
+      arriving(cards[active]);
+      stepping();
+    }
+    render();
+    captions(false);
+    followFocus();
+  }
+
+  // Keep the keyboard on the card that is actually on top
+  function followFocus() {
+    const focused = document.activeElement;
+    if (!focused || !focused.classList || !focused.classList.contains('deck-card')) return;
+    if (focused.classList.contains('is-front')) return;
+    cards[active].focus({ preventScroll: true });
+  }
+
+  // Bars jump by dealing through the cards in between, so it never teleports
+  function jumpTo(target) {
+    if (total < 2 || target === active) return;
+    const forward = (target - active + total) % total;
+    const back = total - forward;
+    const dir = forward <= back ? 1 : -1;
+    let left = Math.min(forward, back);
+
+    const tick = () => {
+      chainTimer = 0;
+      if (!left) return;
+      left -= 1;
+      step(dir, dir > 0 ? -1 : 1);
+      if (left) chainTimer = setTimeout(tick, CHAIN);
+    };
+    tick();
+  }
+
+  /* ---- Autoplay: hands the deck over the moment you touch it ----------- */
+  function startAuto() {
+    if (!auto || autoTimer) return;
+    autoTimer = setInterval(() => {
+      if (paused || !onScreen || document.hidden) return;
+      if (modal && modal.classList.contains('active')) return;
+      if (performance.now() - lastStepAt < AUTOPLAY) return;
+      step(1, -1);
+    }, 400);
+  }
+
+  function handOff() {
+    auto = false;
+    if (autoTimer) { clearInterval(autoTimer); autoTimer = 0; }
+    if (chainTimer) { clearTimeout(chainTimer); chainTimer = 0; }
+  }
+
+  /* ---- Opening a screen ------------------------------------------------ */
+  function openScreen(i) {
+    handOff();
+    document.dispatchEvent(new CustomEvent('screen:open', { detail: i }));
+  }
+
+  /* ---- Input ----------------------------------------------------------- */
+  track.addEventListener('click', (e) => {
+    const card = e.target.closest('.deck-card');
+    if (!card || travel > 6) return;
+    openScreen(parseInt(card.dataset.index, 10));
   });
 
-  viewport.addEventListener('pointermove', (e) => {
-    if (e.pointerType === 'mouse') hovering = true;
+  if (prevBtn) prevBtn.addEventListener('click', () => { handOff(); step(-1, 1); });
+  if (nextBtn) nextBtn.addEventListener('click', () => { handOff(); step(1, -1); });
+
+  stage.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    handOff();
+    pressing = true;
+    pointerId = e.pointerId;
+    startX = lastX = e.clientX;
+    travel = 0;
+    stage.classList.add('is-dragging');
+  });
+
+  stage.addEventListener('pointermove', (e) => {
+    if (e.pointerType === 'mouse') paused = true;
     if (!pressing || e.pointerId !== pointerId) return;
 
-    if (!dragging && Math.abs(e.clientX - startX) > 6) {
-      dragging = true;
-      v = 0;
-      viewport.classList.add('is-dragging');
-      try { viewport.setPointerCapture(pointerId); } catch (_) { }
-    }
-    if (!dragging) return;
-
-    const now = performance.now();
-    const dx = e.clientX - lastX;
-    const dtMs = Math.max(now - lastT, 1);
-    x -= dx;
-    dragV = dragV * 0.65 + ((-dx / dtMs) * 1000) * 0.35;
+    travel = Math.max(travel, Math.abs(e.clientX - lastX));
     lastX = e.clientX;
-    lastT = now;
+    const dx = e.clientX - startX;
+    if (dx && !stage.hasPointerCapture(pointerId)) {
+      try { stage.setPointerCapture(pointerId); } catch (_) { }
+    }
+    dragX = clamp(dx * 0.42, -170, 170);
+    positions(dragX);
   });
 
   function endPress(e) {
     if (!pressing || (e && e.pointerId !== pointerId)) return;
     pressing = false;
-    if (dragging) {
-      const stale = performance.now() - lastT > 90;
-      v = stale ? 0 : clamp(dragV, -4200, 4200);
-      dragging = false;
-      justDragged = true;
-      setTimeout(() => { justDragged = false; }, 0);
-      viewport.classList.remove('is-dragging');
-      try { viewport.releasePointerCapture(pointerId); } catch (_) { }
-    }
+    stage.classList.remove('is-dragging');
+    try { stage.releasePointerCapture(pointerId); } catch (_) { }
+    const dx = lastX - startX;
+    dragX = 0;
+    // Either way you swipe, the deck moves on: the top card falls the way you
+    // pushed it and the next screen comes up through the other side.
+    if (Math.abs(dx) >= SWIPE) step(1, dx < 0 ? 1 : -1);
+    else render();
   }
-  viewport.addEventListener('pointerup', endPress);
-  viewport.addEventListener('pointercancel', endPress);
+  stage.addEventListener('pointerup', endPress);
+  stage.addEventListener('pointercancel', endPress);
 
-  viewport.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse') hovering = true; });
-  viewport.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse' && !pressing) hovering = false; });
-  viewport.addEventListener('focusin', () => { focused = true; });
-  viewport.addEventListener('focusout', () => { focused = false; });
+  stage.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse') paused = true; });
+  stage.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse' && !pressing) paused = false; });
+  stage.addEventListener('focusin', () => { paused = true; });
+  stage.addEventListener('focusout', () => { paused = false; });
 
-  /* ---- Wheel / trackpad ---- */
-  viewport.addEventListener('wheel', (e) => {
-    const horizontal = Math.abs(e.deltaX) > Math.abs(e.deltaY);
-    if (!horizontal && !CAPTURE_VERTICAL_WHEEL) return;   // let the page scroll
+  stage.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      const card = e.target.closest && e.target.closest('.deck-card');
+      if (card) { e.preventDefault(); openScreen(parseInt(card.dataset.index, 10)); }
+      return;
+    }
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
     e.preventDefault();
-    x += horizontal ? e.deltaX : e.deltaY;
+    handOff();
+    const forward = e.key === 'ArrowRight';
+    step(forward ? 1 : -1, forward ? -1 : 1);
+  });
+
+  // Trackpads scroll the deck sideways; the vertical wheel still scrolls the page
+  stage.addEventListener('wheel', (e) => {
+    if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
+    e.preventDefault();
+    handOff();
+    wheelAcc += e.deltaX;
+    clearTimeout(wheelReset);
+    if (Math.abs(wheelAcc) > 34) {
+      step(1, wheelAcc > 0 ? -1 : 1);
+      wheelAcc = 0;
+    } else {
+      wheelReset = setTimeout(() => { wheelAcc = 0; }, 160);
+    }
   }, { passive: false });
 
-  /* ---- Arrows ---- */
-  if (prevBtn) prevBtn.addEventListener('click', () => { v -= NUDGE; });
-  if (nextBtn) nextBtn.addEventListener('click', () => { v += NUDGE; });
+  new IntersectionObserver(([entry]) => { onScreen = entry.isIntersecting; },
+    { rootMargin: '140px 0px' }).observe(stage);
 
-  /* ---- Open lightbox ---- */
-  function open(card) {
-    document.dispatchEvent(new CustomEvent('screen:open', { detail: parseInt(card.dataset.index, 10) }));
-  }
-  track.addEventListener('click', (e) => {
-    if (justDragged) return;
-    const card = e.target.closest('.showcase-card');
-    if (card) open(card);
-  });
-  track.addEventListener('keydown', (e) => {
-    const card = e.target.closest('.showcase-card');
-    if (!card) return;
-    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(card); }
-    if (e.key === 'ArrowRight') { e.preventDefault(); v += NUDGE; }
-    if (e.key === 'ArrowLeft') { e.preventDefault(); v -= NUDGE; }
-  });
-
-  /* ---- Housekeeping ---- */
-  new IntersectionObserver(([entry]) => { visible = entry.isIntersecting; }, { rootMargin: '200px 0px' }).observe(viewport);
-
-  let resizeTimer = 0;
-  const rebuild = () => {
-    const ratio = setWidth ? x / setWidth : 0;
-    build();
-    x = ratio * setWidth;
-    render();
-  };
-  window.addEventListener('resize', () => {
-    clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(rebuild, 120);
-  });
-
-  // Card heights depend on image load, widths don't, so the loop math is stable
-  build();
-  x = 0;
+  /* ---- First paint: place the stack without animating in from nothing --- */
+  cards.forEach((card) => { card.style.transition = 'none'; });
   render();
-  requestAnimationFrame(frame);
+  void stage.offsetWidth;
+  cards.forEach((card) => { card.style.transition = ''; });
+  captions(true);
+  startAuto();
 }
-
 /* --------------------------------------------------------------------------
    Screenshot lightbox
    -------------------------------------------------------------------------- */
@@ -595,7 +755,7 @@ function initLightbox() {
   const next = document.getElementById('lightboxNext');
   if (!modal) return;
 
-  const items = Array.from(document.querySelectorAll('.showcase-card')).map((c) => ({
+  const items = Array.from(document.querySelectorAll('.deck-card')).map((c) => ({
     img: c.dataset.img,
     title: c.dataset.title,
     desc: c.dataset.desc

@@ -112,15 +112,18 @@ Open http://localhost:8000. (Opening `index.html` directly also works, but a loc
 - **Glass surfaces** with a cursor-tracked highlight, plus hover motion on buttons, cards, icons and the nav.
 - **Demo video** with play/pause, mute, scrubbing, and auto-pause when scrolled out of view.
 - **Ring simulator**: sliders drive the calorie and protein rings.
-- **Infinite screenshot slider**: continuous drift, drag with momentum, trackpad and arrow support, depth scaling toward the center, tap to open full size.
+- **Screenshot deck**: one screen on top and the rest stacked behind it. Swipe either way and the top card falls the way you pushed it while the next screen comes up through the opposite side (swipe left: falls left, next from the right). The arrows, arrow keys, sideways trackpad and the position bars deal through the deck in a loop the same way, the caption on the right follows along, and the deck deals itself every 6.5s until you take over. Tap a screen to open it full size.
 - **Features, stack and download hub** (APK, install steps, build from source).
 - **Dark theme only** — the light theme and its navbar toggle were removed.
 ## Tweaks
  
-Top of `initScreenSlider()` in `script.js`:
+Top of `initScreenDeck()` in `script.js`:
  
-- `DRIFT`: auto-scroll speed in px/second (0 for none)
-- `CAPTURE_VERTICAL_WHEEL`: `true` makes the mouse wheel scroll the slider instead of the page while hovering it
+- `AUTOPLAY`: ms between automatic deals. `0` leaves the deck still, and any deliberate input hands the deck over to the visitor for good.
+- `DEPTH` / `LIFT` / `SHRINK` / `TILT` / `SCRIM`: how many cards of the stack stay visible and how far back each step sits, shrinks, leans and darkens.
+- `FLY`: ms the flicked card takes to leave the deck.
+- `SWIPE`: px of drag that commits to the next card.
+- `CHAIN`: ms between steps when a bar is clicked several cards away.
 ## Structure
  
 ```

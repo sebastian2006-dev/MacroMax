@@ -108,7 +108,7 @@
             <div class="phone-notch"></div>
             <div class="phone-screen-container">
               <img src="assets/SC1.jpeg" alt="MacroMax today screen with calorie and protein rings"
-                class="phone-screen-img" loading="eager">
+                class="phone-screen-img" loading="eager" width="738" height="1600">
             </div>
             <div class="phone-glass-gloss"></div>
           </div>
@@ -245,86 +245,81 @@
     <section class="showcase-section" id="screens">
       <div class="section-header">
         <h2 class="section-title">Inside the app</h2>
-        <p class="section-subtitle">Tap any screen to see it full size.</p>
+        <p class="section-subtitle">Drag, swipe or use the arrows to deal through the deck. Tap any screen to see it full size.</p>
       </div>
 
-      <div class="scroller-viewport" id="scrollerViewport" aria-label="App screenshots">
-        <div class="scroller-track" id="scrollerTrack">
-          <article class="showcase-card glass-panel spot" data-img="assets/SC1.jpeg" data-title="Today"
-            data-desc="Calorie and protein rings for the day, a weekly strip to jump between days, and a nudge when your intake is running low.">
-            <div class="phone-frame mini-phone">
-              <div class="phone-notch"></div>
-              <img src="assets/SC1.jpeg" alt="Today screen" loading="lazy" draggable="false">
-            </div>
-            <div class="showcase-card-info">
-              <h3 class="card-screen-title">Today</h3>
-              <p class="card-screen-desc">Both rings, a weekly strip, and a low-intake nudge.</p>
-            </div>
-          </article>
+      <div class="deck-wrap">
+        <div class="deck-stage" id="deckStage" role="group" aria-roledescription="carousel"
+          aria-label="MacroMax screenshots">
+          <div class="deck-track" id="deckTrack">
+            <article class="deck-card" data-img="assets/SC1.jpeg" data-title="Today"
+              data-desc="Calorie and protein rings for the day, a weekly strip to jump between days, and a nudge when your intake is running low.">
+              <div class="phone-frame mini-phone">
+                <div class="phone-notch"></div>
+                <img src="assets/SC1.jpeg" alt="Today screen" loading="lazy" draggable="false" width="738" height="1600">
+              </div>
+            </article>
 
-          <article class="showcase-card glass-panel spot" data-img="assets/SC5.jpeg" data-title="Meal log"
-            data-desc="Meals are grouped into breakfast, lunch, dinner and snacks. Adjust serving sizes, edit an entry, or lock the day so totals stop changing.">
-            <div class="phone-frame mini-phone">
-              <div class="phone-notch"></div>
-              <img src="assets/SC5.jpeg" alt="Meal log screen" loading="lazy" draggable="false">
-            </div>
-            <div class="showcase-card-info">
-              <h3 class="card-screen-title">Meal log</h3>
-              <p class="card-screen-desc">Serving-aware portions, quick edits, one-tap day lock.</p>
-            </div>
-          </article>
+            <article class="deck-card" data-img="assets/SC5.jpeg" data-title="Meal log"
+              data-desc="Meals are grouped into breakfast, lunch, dinner and snacks. Adjust serving sizes, edit an entry, or lock the day so totals stop changing.">
+              <div class="phone-frame mini-phone">
+                <div class="phone-notch"></div>
+                <img src="assets/SC5.jpeg" alt="Meal log screen" loading="lazy" draggable="false" width="738" height="1600">
+              </div>
+            </article>
 
-          <article class="showcase-card glass-panel spot" data-img="assets/SC3.jpeg" data-title="Dish builder"
-            data-desc="Combine ingredients, set the weight of each, and MacroMax adds up calories, protein, carbs and fat. Save the dish to log it again in one tap.">
-            <div class="phone-frame mini-phone">
-              <div class="phone-notch"></div>
-              <img src="assets/SC3.jpeg" alt="Dish builder screen" loading="lazy" draggable="false">
-            </div>
-            <div class="showcase-card-info">
-              <h3 class="card-screen-title">Dish builder</h3>
-              <p class="card-screen-desc">Pick ingredients, set weights, save the dish for reuse.</p>
-            </div>
-          </article>
+            <article class="deck-card" data-img="assets/SC3.jpeg" data-title="Dish builder"
+              data-desc="Combine ingredients, set the weight of each, and MacroMax adds up calories, protein, carbs and fat. Save the dish to log it again in one tap.">
+              <div class="phone-frame mini-phone">
+                <div class="phone-notch"></div>
+                <img src="assets/SC3.jpeg" alt="Dish builder screen" loading="lazy" draggable="false" width="738" height="1600">
+              </div>
+            </article>
 
-          <article class="showcase-card glass-panel spot" data-img="assets/SC2.jpeg" data-title="Analytics"
-            data-desc="Trend charts that scale to your numbers, a macro split for the period you pick, and a rolling 7-day average.">
-            <div class="phone-frame mini-phone">
-              <div class="phone-notch"></div>
-              <img src="assets/SC2.jpeg" alt="Analytics screen" loading="lazy" draggable="false">
-            </div>
-            <div class="showcase-card-info">
-              <h3 class="card-screen-title">Analytics</h3>
-              <p class="card-screen-desc">Trend charts, macro split, and a rolling 7-day average.</p>
-            </div>
-          </article>
+            <article class="deck-card" data-img="assets/SC2.jpeg" data-title="Analytics"
+              data-desc="Trend charts that scale to your numbers, a macro split for the period you pick, and a rolling 7-day average.">
+              <div class="phone-frame mini-phone">
+                <div class="phone-notch"></div>
+                <img src="assets/SC2.jpeg" alt="Analytics screen" loading="lazy" draggable="false" width="738" height="1600">
+              </div>
+            </article>
 
-          <article class="showcase-card glass-panel spot" data-img="assets/SC6.jpeg" data-title="Profile and backup"
-            data-desc="Set your calorie and macro targets. Export everything as JSON through the Android share sheet and restore it on any device.">
-            <div class="phone-frame mini-phone">
-              <div class="phone-notch"></div>
-              <img src="assets/SC6.jpeg" alt="Profile and backup screen" loading="lazy" draggable="false">
-            </div>
-            <div class="showcase-card-info">
-              <h3 class="card-screen-title">Profile and backup</h3>
-              <p class="card-screen-desc">Set targets, export to JSON, restore on a new phone.</p>
-            </div>
-          </article>
+            <article class="deck-card" data-img="assets/SC6.jpeg" data-title="Profile and backup"
+              data-desc="Set your calorie and macro targets. Export everything as JSON through the Android share sheet and restore it on any device.">
+              <div class="phone-frame mini-phone">
+                <div class="phone-notch"></div>
+                <img src="assets/SC6.jpeg" alt="Profile and backup screen" loading="lazy" draggable="false" width="738" height="1600">
+              </div>
+            </article>
+          </div>
         </div>
-      </div>
 
-      <div class="scroller-controls-row">
-        <button type="button" class="scroller-arrow-btn" id="scrollerPrevBtn" aria-label="Previous screens">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-            stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="15 18 9 12 15 6" />
-          </svg>
-        </button>
-        <button type="button" class="scroller-arrow-btn" id="scrollerNextBtn" aria-label="Next screens">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-            stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="9 18 15 12 9 6" />
-          </svg>
-        </button>
+        <div class="deck-panel glass-panel spot">
+          <div class="deck-copy" aria-live="polite">
+            <h3 class="deck-title" id="deckTitle">Today</h3>
+            <p class="deck-desc" id="deckDesc">Calorie and protein rings for the day, a weekly strip to jump between
+              days, and a nudge when your intake is running low.</p>
+          </div>
+
+          <div class="deck-footer">
+            <div class="deck-bars" id="deckBars" role="tablist" aria-label="Jump to a screen"></div>
+
+            <div class="deck-controls">
+              <button type="button" class="deck-arrow-btn" id="deckPrevBtn" aria-label="Previous screen">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="15 18 9 12 15 6" />
+                </svg>
+              </button>
+              <button type="button" class="deck-arrow-btn" id="deckNextBtn" aria-label="Next screen">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="9 18 15 12 9 6" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
 
