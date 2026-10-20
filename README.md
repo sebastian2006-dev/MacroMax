@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="./assets/macromax_A_ring_1024.png" width="120" alt="MacroMax app icon" />
+  <img src="./macromax-banner.svg" alt="MacroMax Banner" width="100%" />
 </div>
 
 # MacroMax
